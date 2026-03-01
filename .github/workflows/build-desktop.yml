@@ -1,0 +1,110 @@
+name: Build Desktop (Windows · macOS · Linux)
+
+on:
+  push:
+    branches: [main]
+    paths: ['desktop/**']
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: ''
+          - platform: macos-latest
+            args: '--target aarch64-apple-darwin'
+          - platform: macos-latest
+            args: '--target x86_64-apple-darwin'
+          - platform: ubuntu-22.04
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+    defaults:
+      run:
+        working-directory: desktop
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev \
+            libayatana-appindicator3-dev librsvg2-dev patchelf \
+            pkg-config libssl-dev xdg-utils
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri -> target
+
+      - name: Download Xray binary (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $url = "https://github.com/XTLS/Xray-core/releases/download/v26.2.6/Xray-windows-64.zip"
+          Invoke-WebRequest $url -OutFile xray.zip
+          Expand-Archive xray.zip -DestinationPath src-tauri/binaries/
+          Rename-Item src-tauri/binaries/xray.exe src-tauri/binaries/xray-x86_64-pc-windows-msvc.exe
+
+      - name: Download Xray binary (macOS arm64)
+        if: matrix.platform == 'macos-latest' && contains(matrix.args, 'aarch64')
+        run: |
+          curl -L https://github.com/XTLS/Xray-core/releases/download/v26.2.6/Xray-macos-arm64-v8a.zip -o xray.zip
+          unzip xray.zip xray -d src-tauri/binaries/
+          mv src-tauri/binaries/xray src-tauri/binaries/xray-aarch64-apple-darwin
+          chmod +x src-tauri/binaries/xray-aarch64-apple-darwin
+
+      - name: Download Xray binary (macOS x64)
+        if: matrix.platform == 'macos-latest' && contains(matrix.args, 'x86_64')
+        run: |
+          curl -L https://github.com/XTLS/Xray-core/releases/download/v26.2.6/Xray-macos-64.zip -o xray.zip
+          unzip xray.zip xray -d src-tauri/binaries/
+          mv src-tauri/binaries/xray src-tauri/binaries/xray-x86_64-apple-darwin
+          chmod +x src-tauri/binaries/xray-x86_64-apple-darwin
+
+      - name: Download Xray binary (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          curl -L https://github.com/XTLS/Xray-core/releases/download/v26.2.6/Xray-linux-64.zip -o xray.zip
+          unzip xray.zip xray -d src-tauri/binaries/
+          mv src-tauri/binaries/xray src-tauri/binaries/xray-x86_64-unknown-linux-gnu
+          chmod +x src-tauri/binaries/xray-x86_64-unknown-linux-gnu
+
+      - name: Install npm deps
+        run: npm ci
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: ${{ matrix.args }}
+          projectPath: desktop
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}-${{ strategy.job-index }}
+          path: |
+            desktop/src-tauri/target/release/bundle/msi/*.msi
+            desktop/src-tauri/target/release/bundle/dmg/*.dmg
+            desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+            desktop/src-tauri/target/release/bundle/deb/*.deb
+          if-no-files-found: ignore

@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SpicyVPN</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #000;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+      overflow: hidden;
+    }
+
+    /* Title bar drag area */
+    .titlebar {
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      -webkit-app-region: drag;
+    }
+    .titlebar span {
+      font-size: 13px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.7);
+      letter-spacing: -0.3px;
+    }
+    .titlebar-actions { -webkit-app-region: no-drag; }
+    .settings-btn {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.3);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      transition: color 0.2s;
+    }
+    .settings-btn:hover { color: rgba(255,255,255,0.7); }
+
+    /* Main content */
+    .content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      gap: 0;
+    }
+
+    /* Power button */
+    .power-ring {
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      border: 1.5px solid var(--ring-color, rgba(255,255,255,0.1));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 32px;
+      transition: border-color 0.5s;
+      position: relative;
+    }
+    .power-ring::before {
+      content: '';
+      position: absolute;
+      inset: -8px;
+      border-radius: 50%;
+      border: 1px solid var(--ring-color, rgba(255,255,255,0.04));
+      transition: border-color 0.5s;
+      opacity: 0.5;
+    }
+
+    .power-btn {
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      background: var(--btn-bg, rgba(255,255,255,0.04));
+      border: 1.5px solid var(--btn-border, rgba(255,255,255,0.15));
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s;
+      outline: none;
+    }
+    .power-btn:hover {
+      background: var(--btn-bg-hover, rgba(255,255,255,0.08));
+    }
+    .power-btn:active { transform: scale(0.96); }
+    .power-btn svg { width: 40px; height: 40px; }
+
+    /* Status */
+    .status-label {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--status-color, rgba(255,255,255,0.3));
+      margin-bottom: 8px;
+      transition: color 0.5s;
+    }
+    .status-sub {
+      font-size: 13px;
+      color: rgba(255,255,255,0.25);
+      text-align: center;
+      line-height: 1.5;
+      min-height: 40px;
+    }
+
+    /* Token section */
+    .token-section {
+      width: 100%;
+      margin-top: 32px;
+    }
+    .token-display {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .token-display:hover { border-color: rgba(255,255,255,0.15); }
+    .token-text {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 13px;
+      color: rgba(255,255,255,0.4);
+      letter-spacing: 0.5px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .token-icon { color: rgba(255,255,255,0.2); flex-shrink: 0; font-size: 14px; }
+
+    /* Error */
+    .error-msg {
+      margin-top: 12px;
+      padding: 10px 14px;
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.2);
+      border-radius: 8px;
+      font-size: 12px;
+      color: #f87171;
+      text-align: center;
+      display: none;
+    }
+
+    /* Token modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 24px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #111;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 24px;
+      width: 100%;
+      max-width: 320px;
+    }
+    .modal h2 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      letter-spacing: -0.3px;
+    }
+    .modal p {
+      font-size: 13px;
+      color: rgba(255,255,255,0.35);
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+    .token-input-wrap {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .token-input {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      color: #fff;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 14px;
+      letter-spacing: 1px;
+      padding: 14px;
+    }
+    .token-input::placeholder { color: rgba(255,255,255,0.2); letter-spacing: 0.5px; }
+    .paste-btn {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.3);
+      cursor: pointer;
+      padding: 12px;
+      font-size: 18px;
+      transition: color 0.2s;
+    }
+    .paste-btn:hover { color: rgba(255,255,255,0.7); }
+    .modal-actions { display: flex; gap: 8px; }
+    .btn-cancel {
+      flex: 1;
+      padding: 12px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      color: rgba(255,255,255,0.5);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-cancel:hover { background: rgba(255,255,255,0.1); }
+    .btn-confirm {
+      flex: 2;
+      padding: 12px;
+      background: #fff;
+      border: none;
+      border-radius: 10px;
+      color: #000;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn-confirm:hover { opacity: 0.9; }
+    .btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+    .modal-error {
+      font-size: 12px;
+      color: #f87171;
+      margin-bottom: 10px;
+      display: none;
+    }
+
+    /* Connected pulse animation */
+    @keyframes pulse {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 0.7; }
+    }
+    .connected .power-ring { animation: pulse 2.5s ease-in-out infinite; }
+
+    /* States */
+    body.connected {
+      --ring-color: rgba(52, 211, 153, 0.3);
+      --btn-bg: rgba(52, 211, 153, 0.08);
+      --btn-border: rgba(52, 211, 153, 0.4);
+      --btn-bg-hover: rgba(52, 211, 153, 0.12);
+      --status-color: #34d399;
+    }
+    body.connecting {
+      --ring-color: rgba(251, 191, 36, 0.3);
+      --btn-bg: rgba(251, 191, 36, 0.06);
+      --btn-border: rgba(251, 191, 36, 0.3);
+      --status-color: #fbbf24;
+    }
+  </style>
+</head>
+<body>
+  <!-- Title bar -->
+  <div class="titlebar">
+    <span>SpicyVPN</span>
+    <div class="titlebar-actions">
+      <button class="settings-btn" onclick="openModal()" title="Change token">
+        &#9881;
+      </button>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <div class="content">
+    <div class="power-ring" id="powerRing">
+      <button class="power-btn" id="powerBtn" onclick="toggle()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2v6M6.22 6.22a9 9 0 1 0 11.56 0" />
+        </svg>
+      </button>
+    </div>
+
+    <div class="status-label" id="statusLabel">Unprotected</div>
+    <div class="status-sub" id="statusSub">Click to connect</div>
+
+    <div class="token-section">
+      <div class="token-display" onclick="openModal()" id="tokenDisplay">
+        <span class="token-text" id="tokenText">No token — click to set up</span>
+        <span class="token-icon">&#9998;</span>
+      </div>
+      <div class="error-msg" id="errorMsg"></div>
+    </div>
+  </div>
+
+  <!-- Token modal -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <h2>Access Token</h2>
+      <p>Get your token from spicypepper.app after signing in.</p>
+      <div class="token-input-wrap">
+        <input
+          class="token-input"
+          id="tokenInput"
+          type="text"
+          placeholder="spx_xxxxxxxxxxxxxxxx"
+          spellcheck="false"
+          autocomplete="off"
+        />
+        <button class="paste-btn" onclick="pasteToken()" title="Paste">&#8997;</button>
+      </div>
+      <div class="modal-error" id="modalError"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+        <button class="btn-confirm" id="confirmBtn" onclick="saveToken()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { invoke } = window.__TAURI__.core;
+    const store = window.__TAURI__.store;
+
+    let vpnStatus = 'disconnected';
+    let currentToken = null;
+    let vpnConfig = null;
+
+    async function init() {
+      const s = await store.load('settings.json');
+      currentToken = await s.get('token');
+      updateTokenDisplay();
+      vpnStatus = await invoke('get_status');
+      updateUI();
+    }
+
+    async function toggle() {
+      if (!currentToken) { openModal(); return; }
+
+      if (vpnStatus === 'connected') {
+        await disconnect();
+      } else if (vpnStatus === 'disconnected') {
+        await connect();
+      }
+    }
+
+    async function connect() {
+      setStatus('connecting');
+      hideError();
+      try {
+        vpnConfig = await invoke('fetch_config', { token: currentToken });
+        await invoke('connect', { config: vpnConfig });
+        setStatus('connected');
+      } catch (e) {
+        setStatus('disconnected');
+        showError(e);
+      }
+    }
+
+    async function disconnect() {
+      await invoke('disconnect');
+      setStatus('disconnected');
+    }
+
+    function setStatus(s) {
+      vpnStatus = s;
+      document.body.className = s;
+      const label = document.getElementById('statusLabel');
+      const sub = document.getElementById('statusSub');
+      const btn = document.getElementById('powerBtn');
+
+      if (s === 'connected') {
+        label.textContent = 'Protected';
+        sub.textContent = 'Your connection is secured\nand invisible to the network';
+        btn.style.color = '#34d399';
+      } else if (s === 'connecting') {
+        label.textContent = 'Connecting...';
+        sub.textContent = 'Establishing stealth tunnel...';
+        btn.style.color = '#fbbf24';
+      } else {
+        label.textContent = 'Unprotected';
+        sub.textContent = currentToken ? 'Click to connect' : 'Enter your token to get started';
+        btn.style.color = 'rgba(255,255,255,0.3)';
+      }
+    }
+
+    function updateTokenDisplay() {
+      const el = document.getElementById('tokenText');
+      if (currentToken) {
+        el.textContent = currentToken;
+      } else {
+        el.textContent = 'No token — click to set up';
+      }
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('errorMsg');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    function hideError() {
+      document.getElementById('errorMsg').style.display = 'none';
+    }
+
+    function openModal() {
+      document.getElementById('tokenInput').value = currentToken || '';
+      document.getElementById('modalError').style.display = 'none';
+      document.getElementById('modalOverlay').classList.add('open');
+      setTimeout(() => document.getElementById('tokenInput').focus(), 100);
+    }
+
+    function closeModal() {
+      document.getElementById('modalOverlay').classList.remove('open');
+    }
+
+    async function pasteToken() {
+      try {
+        const text = await navigator.clipboard.readText();
+        document.getElementById('tokenInput').value = text.trim();
+      } catch {}
+    }
+
+    async function saveToken() {
+      const token = document.getElementById('tokenInput').value.trim();
+      const errEl = document.getElementById('modalError');
+      const btn = document.getElementById('confirmBtn');
+
+      if (!token) {
+        errEl.textContent = 'Please enter your token';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Checking...';
+      errEl.style.display = 'none';
+
+      try {
+        // Validate token against API
+        await invoke('fetch_config', { token });
+
+        // Save to store
+        const s = await store.load('settings.json');
+        await s.set('token', token);
+        await s.save();
+
+        currentToken = token;
+        updateTokenDisplay();
+        closeModal();
+        setStatus('disconnected');
+      } catch (e) {
+        errEl.textContent = e;
+        errEl.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save';
+      }
+    }
+
+    // Keyboard shortcut
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+      if (e.key === 'Enter' && document.getElementById('modalOverlay').classList.contains('open')) {
+        saveToken();
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>

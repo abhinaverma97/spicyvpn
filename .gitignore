@@ -1,0 +1,32 @@
+# Node
+node_modules/
+.env
+.env.local
+
+# Next.js
+website/.next/
+website/out/
+
+# Rust / Tauri
+desktop/src-tauri/target/
+
+# Flutter / Android
+android/build/
+android/.dart_tool/
+android/.flutter-plugins
+android/.flutter-plugins-dependencies
+android/.packages
+android/android/.gradle/
+android/android/app/debug/
+android/android/app/profile/
+android/android/app/release/
+android/ios/Pods/
+android/ios/.symlinks/
+
+# DB / secrets
+*.db
+*.db-journal
+
+# OS
+.DS_Store
+Thumbs.db

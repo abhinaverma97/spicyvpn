@@ -3,7 +3,7 @@ name: Build Android APK
 on:
   push:
     branches: [main]
-    paths: ['android/**']
+    paths: ['android/**', '.github/workflows/build-android.yml']
   workflow_dispatch:
 
 jobs:
@@ -32,9 +32,6 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
-      - name: Build APK (debug)
-        run: flutter build apk --debug
-
       - name: Build APK (release)
         run: flutter build apk --release
 
@@ -44,13 +41,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk
+          name: android-release
           path: |
             android/build/app/outputs/flutter-apk/app-release.apk
             android/build/app/outputs/bundle/release/app-release.aab
-
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-apk-debug
-          path: android/build/app/outputs/flutter-apk/app-debug.apk

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_v2ray/flutter_v2ray.dart';
-import 'package:permission_handler/permission_handler.dart';
 import '../services/api_service.dart';
 import '../models/vpn_config.dart';
 import 'token_screen.dart';
@@ -75,18 +74,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       final config = await ApiService.connect(_token!);
       setState(() => _config = config);
 
-      if (await Permission.vpnService.request().isGranted) {
-        await _flutterV2ray.startV2Ray(
-          remark: 'SpicyVPN',
-          config: config.toVlessLink(),
-          proxyOnly: false,
-        );
-      } else {
-        setState(() {
-          _status = VpnStatus.disconnected;
-          _error = 'VPN permission denied';
-        });
-      }
+      await _flutterV2ray.startV2Ray(
+        remark: 'SpicyVPN',
+        config: config.toVlessLink(),
+        proxyOnly: false,
+      );
     } catch (e) {
       setState(() {
         _status = VpnStatus.disconnected;

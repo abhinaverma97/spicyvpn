@@ -26,6 +26,9 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
+      - name: Generate iOS project scaffold
+        run: flutter create --platforms ios . --project-name spicyvpn
+
       - name: Install CocoaPods
         run: |
           cd ios

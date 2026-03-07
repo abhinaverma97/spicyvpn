@@ -1,0 +1,77 @@
+"use client";
+
+import { useState } from "react";
+import { signIn, useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { Shield } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import dynamic from "next/dynamic";
+
+const Dither = dynamic(() => import("./Dither"), { ssr: false });
+
+export default function LandingPage() {
+  const [loading, setLoading] = useState(false);
+  const { data: session } = useSession();
+  const router = useRouter();
+
+  return (
+    <div className="relative min-h-screen bg-black text-white flex flex-col overflow-hidden">
+
+      {/* Dither background */}
+      <div className="absolute inset-0 z-0">
+        <Dither />
+        <div className="absolute inset-0 bg-black/50" />
+      </div>
+
+      {/* Hero */}
+      <main className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-6 py-24">
+        <div className="inline-flex items-center gap-2 text-xs text-white/40 border border-white/10 rounded-full px-4 py-1.5 mb-8 backdrop-blur-sm">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          Stealth encrypted · No logs
+        </div>
+
+        <h1 className="text-5xl sm:text-7xl font-black tracking-tighter leading-none mb-6 max-w-3xl">
+          Invisible.
+          <br />
+          <span className="text-white/30">Untraceable.</span>
+        </h1>
+
+        <p className="text-white/40 text-lg max-w-md mb-10 leading-relaxed">
+          A private tunnel that looks like nothing at all.
+          One link. Works everywhere.
+        </p>
+
+        <Button
+          onClick={() => {
+            if (session) {
+              router.push("/dashboard");
+            } else {
+              setLoading(true);
+              signIn("google", { callbackUrl: "/dashboard" });
+            }
+          }}
+          disabled={loading}
+          className="bg-white text-black hover:bg-white/90 px-8 py-3 rounded-full font-semibold text-sm"
+        >
+          {loading ? (
+            <span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+          ) : session ? (
+            "Go to dashboard →"
+          ) : (
+            "Get started free"
+          )}
+        </Button>
+
+        <p className="text-white/20 text-xs mt-4">{session ? session.user?.email : "No credit card required"}</p>
+      </main>
+
+      {/* Footer */}
+      <footer className="relative z-10 border-t border-white/5 py-6 px-6 text-center">
+        <div className="flex items-center justify-center gap-2 text-white/20 text-xs">
+          <Shield className="w-3.5 h-3.5" />
+          <span>SpicyVPN · Private by design</span>
+        </div>
+      </footer>
+    </div>
+  );
+}

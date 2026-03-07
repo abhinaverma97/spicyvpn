@@ -1,0 +1,97 @@
+import Database from "better-sqlite3";
+import path from "path";
+
+const DB_PATH = path.join(process.cwd(), "prisma/dev.db");
+
+let _db: Database.Database | null = null;
+
+export function getDb(): Database.Database {
+  if (!_db) {
+    _db = new Database(DB_PATH);
+    _db.pragma("journal_mode = WAL");
+    _db.pragma("foreign_keys = ON");
+    // Add busy timeout to prevent "database is locked" errors
+    _db.pragma("busy_timeout = 5000");
+    initSchema(_db);
+  }
+  return _db;
+}
+
+function initSchema(db: Database.Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      name TEXT,
+      email TEXT UNIQUE,
+      emailVerified INTEGER,
+      image TEXT,
+      createdAt INTEGER DEFAULT (unixepoch())
+    );
+
+    CREATE TABLE IF NOT EXISTS accounts (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      type TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      providerAccountId TEXT NOT NULL,
+      refresh_token TEXT,
+      access_token TEXT,
+      expires_at INTEGER,
+      token_type TEXT,
+      scope TEXT,
+      id_token TEXT,
+      session_state TEXT,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(provider, providerAccountId)
+    );
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      sessionToken TEXT UNIQUE NOT NULL,
+      userId TEXT NOT NULL,
+      expires INTEGER NOT NULL,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS vpn_configs (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      uuid TEXT UNIQUE NOT NULL,
+      token TEXT UNIQUE,
+      expiresAt INTEGER NOT NULL,
+      active INTEGER DEFAULT 1,
+      createdAt INTEGER DEFAULT (unixepoch()),
+      totalUp INTEGER DEFAULT 0,
+      totalDown INTEGER DEFAULT 0,
+      lastActive INTEGER DEFAULT 0,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS token_devices (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      token TEXT NOT NULL,
+      ip TEXT NOT NULL,
+      firstSeen INTEGER DEFAULT (unixepoch()),
+      lastSeen INTEGER DEFAULT (unixepoch()),
+      UNIQUE(token, ip)
+    );
+  `);
+
+  // Simple migrations for existing tables
+  try {
+    const tableInfo = db.pragma("table_info(vpn_configs)") as any[];
+    const columns = tableInfo.map(c => c.name);
+    
+    if (!columns.includes("totalUp")) {
+      db.exec("ALTER TABLE vpn_configs ADD COLUMN totalUp INTEGER DEFAULT 0;");
+    }
+    if (!columns.includes("totalDown")) {
+      db.exec("ALTER TABLE vpn_configs ADD COLUMN totalDown INTEGER DEFAULT 0;");
+    }
+    if (!columns.includes("lastActive")) {
+      db.exec("ALTER TABLE vpn_configs ADD COLUMN lastActive INTEGER DEFAULT 0;");
+    }
+  } catch (error) {
+    console.error("Migration error:", error);
+  }
+}

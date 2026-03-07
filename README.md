@@ -98,5 +98,13 @@ Users can connect using the **Hiddify** app (available on Android, iOS, Windows,
 
 For gaming (e.g., Valorant, Discord), users should enable **VPN Mode** in Hiddify to route all UDP traffic through the proxy.
 
+## ⚡ Performance Optimizations
+
+To ensure extreme speed and ultra-low latency for gaming and heavy downloads, the following system-level optimizations have been applied to the host server:
+
+1.  **BBR Congestion Control**: The Linux kernel is configured to use Google's BBR (`net.ipv4.tcp_congestion_control=bbr`) and `fq` queueing discipline to maximize throughput and minimize packet loss over long-distance links.
+2.  **Maximized UDP Buffers**: Since Hysteria 2's QUIC protocol relies heavily on UDP, the kernel's UDP read/write buffers (`net.core.rmem_max` and `net.core.wmem_max`) have been expanded to 67MB. This prevents packet dropping during high-bandwidth bursts.
+3.  **ALPN Hardcoding**: The Hysteria 2 configuration explicitly defines the Application-Layer Protocol Negotiation (ALPN) as `h3` (HTTP/3). This bypasses the standard negotiation handshake, saving a full round-trip (RTT) and connecting clients slightly faster.
+
 ## 🛡️ License
 Private / Proprietary.

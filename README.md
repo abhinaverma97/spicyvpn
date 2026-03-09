@@ -1,124 +1,156 @@
-# 🌶️ SpicyVPN (StealthVPN) - The Ultimate Stealth VPN Platform
+# 🌶️ SpicyVPN (StealthVPN) - Comprehensive System Documentation
 
-Welcome to the comprehensive documentation for **SpicyVPN**. This document covers every aspect of the product, from the underlying protocols and system architecture to deployment, cost analysis, and future roadmaps.
+SpicyVPN is an enterprise-grade, stealth-focused VPN management platform designed to bypass the most aggressive network restrictions globally (including Deep Packet Inspection and strict corporate firewalls) while delivering uncompromising speed and ultra-low latency for competitive gaming and 4K streaming.
+
+This document serves as the absolute source of truth for the project, covering deep technical architecture, deployment nuances, economic models, and future scalability blueprints.
+
+---
 
 ## 📖 Table of Contents
-1. [Product Overview](#1-product-overview)
-2. [Technology Stack & Protocol](#2-technology-stack--protocol)
-3. [Architecture & How It Works](#3-architecture--how-it-works)
-4. [Infrastructure & Setup](#4-infrastructure--setup)
-5. [Cost Analysis (Current & Future)](#5-cost-analysis)
-6. [Node Management & Scaling](#6-node-management--scaling)
-7. [Future Roadmap & Monetization](#7-future-roadmap--monetization)
+1. [The Problem & The Protocol](#1-the-problem--the-protocol)
+2. [Deep Architectural Breakdown](#2-deep-architectural-breakdown)
+3. [Database Schema & Data Flow](#3-database-schema--data-flow)
+4. [Infrastructure & Network Setup](#4-infrastructure--network-setup)
+5. [Cost Economics & Scaling Analysis](#5-cost-economics--scaling-analysis)
+6. [Multi-Node (Master/Slave) Evolution](#6-multi-node-masterslave-evolution)
+7. [Product Roadmap & Monetization Strategy](#7-product-roadmap--monetization-strategy)
 
 ---
 
-## 1. Product Overview
-SpicyVPN is a high-performance, next-generation VPN management platform. Designed to bypass aggressive network restrictions (like Deep Packet Inspection) and provide ultra-low latency for gaming and streaming. It features an automated user portal, auto-updating client configurations, and rigorous data/time quota enforcement.
+## 1. The Problem & The Protocol
+
+### Why Traditional VPNs Fail
+Legacy protocols like **OpenVPN**, **WireGuard**, and **IPsec** use easily identifiable packet signatures. Modern firewalls (like the Great Firewall or corporate DPI appliances) analyze these headers, recognize the VPN traffic, and either throttle the connection to unusable speeds or outright drop the packets. 
+
+### The Solution: Hysteria 2 (QUIC + Obfuscation)
+SpicyVPN is powered by the **Hysteria 2** protocol, which fundamentally shifts how traffic is transmitted:
+- **QUIC / UDP Transport**: It operates entirely over UDP using a customized QUIC protocol. This completely bypasses TCP handshake overhead, resulting in dramatically lower latency (ping) and significantly faster connection establishment.
+- **Congestion Control**: It utilizes brutal, aggressive congestion control algorithms (like BBR) that effectively "bully" their way through congested international routing links to maintain high speeds.
+- **Camouflage / Masquerading**: Hysteria 2 traffic is mathematically indistinguishable from normal **HTTP/3** web traffic. To a firewall analyzing the packets, a user connecting to SpicyVPN looks exactly like a user securely browsing `https://bing.com` or watching a YouTube video. 
 
 ---
 
-## 2. Technology Stack & Protocol
+## 2. Deep Architectural Breakdown
 
-### The Core Protocol: Hysteria 2
-Instead of traditional VPN protocols like OpenVPN or WireGuard (which are easily blocked by modern firewalls), SpicyVPN is powered by **Hysteria 2**.
-- **Transport**: UDP-based QUIC protocol.
-- **Stealth / Obfuscation**: It masquerades as standard HTTP/3 traffic (e.g., disguising itself as connections to `bing.com`). Firewalls and ISPs see it as normal web browsing, preventing throttling and blocking.
-- **Performance**: Brutal UDP acceleration ensures ultra-low latency (ping) and maximum throughput, making it highly effective for competitive gaming (Valorant, CS:GO) and bypassing congested international routing.
+SpicyVPN operates as a tightly integrated trinity of localized services.
 
-### The Web & Management Stack
-- **Frontend/Backend**: **Next.js 16 (React)**. Handles the user UI, Google OAuth, subscription API, and the secure Admin Dashboard.
-- **Database**: **SQLite (via better-sqlite3)**. Chosen for its blazing-fast local performance. Configured in **WAL (Write-Ahead Logging)** mode to allow simultaneous reads (from the Web API) and writes (from the background traffic agent) without database locking.
-- **Traffic Agent**: A lightweight **Node.js daemon** that constantly polls the VPN core and syncs with the database.
+### A. The Web Engine (`stealthvpn.service` / Next.js)
+- **Framework**: Next.js 16 (App Router) running on Node.js.
+- **Role**: The central nervous system. It serves the user-facing React dashboard, handles Google OAuth 2.0 (via `next-auth`), and acts as the gatekeeper.
+- **The Auth Hook (`POST /api/h2/auth`)**: Hysteria 2 does not have a built-in user database. Instead, every time a client attempts to connect, the Hysteria core sends an internal HTTP POST request to this endpoint containing the client's UUID. Next.js queries the database. If the UUID is valid, active, and has remaining data, Next.js returns `{"ok": true, "id": "uuid-1234"}`.
+- **The Subscription API (`GET /api/sub?token=...`)**: Generates Base64 encoded connection strings for clients. Crucially, it injects custom HTTP headers (`Profile-Update-Interval: 1`, `Subscription-Userinfo: upload=X; download=Y; total=Z`) forcing client apps like Hiddify to auto-sync usage progress bars in the background every hour.
 
----
+### B. The VPN Router (`hysteria-server.service`)
+- **Role**: The actual traffic router. A compiled, lightweight Golang binary running natively on the host.
+- **Network**: Listens on `UDP 8443` for inbound encrypted client tunnels.
+- **Internal API**: Exposes a private REST API on `TCP 127.0.0.1:8080`. This API provides real-time byte counters (`tx` and `rx`) for every connected `id` and accepts external commands to forcibly terminate specific user sessions.
 
-## 3. Architecture & How It Works
-
-SpicyVPN operates on a synchronized trinity of services:
-
-1. **The Web API (`stealthvpn.service`)**
-   - Users log in via Google OAuth.
-   - Generates a unique UUID and a secure token for each user, automatically assigning a 30-day, 30GB limit.
-   - Provides a `/api/sub` endpoint. When clients (like Hiddify) fetch this link, it returns the Base64 encoded Hysteria config along with `Profile-Update-Interval` and `Subscription-Userinfo` headers so the app knows the exact data limits and auto-refreshes every hour.
-
-2. **The VPN Core (`hysteria-server.service`)**
-   - Listens on `UDP 8443` for client connections.
-   - **Auth Hook**: When a client attempts to connect, Hysteria asks the Next.js API (`POST /api/h2/auth`). The API checks the SQLite DB to ensure the user exists, hasn't expired, and has data left. If valid, it returns the user's ID to track traffic.
-
-3. **The Enforcer (`stealthvpn-agent.service`)**
-   - Every 30 seconds, this background script queries Hysteria's internal REST API (`TCP 8080`) for live `tx` and `rx` (transmit/receive) bytes.
-   - It calculates the data used since the last ping and updates the SQLite database.
-   - **Active Kicking**: If a user hits their 30GB limit or their time expires *while* actively connected, the agent immediately sends a `POST /kick` command to Hysteria, instantly severing their VPN connection mid-session.
+### C. The Enforcer (`stealthvpn-agent.service` / `traffic-agent.js`)
+- **Role**: The bridge between the stateless VPN router and the stateful Web Engine.
+- **The Event Loop (Every 30 Seconds)**:
+  1. Queries Hysteria's `TCP 8080/traffic` endpoint.
+  2. Calculates the delta (bytes used in the last 30s) by comparing the new payload against the previous payload stored in RAM.
+  3. Executes an `UPDATE` SQL statement to increment `totalUp` and `totalDown` in the database.
+  4. **Active Severing**: Evaluates the new total against the `TRAFFIC_LIMIT` (30GB) and checks the `expiresAt` timestamp. If a user exceeds *either* limit, the agent instantly executes an HTTP `POST` to Hysteria's `/kick` API, forcefully terminating the active QUIC tunnel.
 
 ---
 
-## 4. Infrastructure & Setup
+## 3. Database Schema & Data Flow
 
-### Where We Set It Up
-Currently, the entire stack (Database, Web UI, and VPN Core) is hosted on a **Single Node architecture**.
-- **Provider**: Oracle Cloud (Free Tier).
-- **OS**: Ubuntu Linux (ARM64 compatible).
-- **Network**: Domain `spicypepper.app` routed to the VPS, utilizing reverse proxy/SSL termination.
+### The Engine: SQLite (Write-Ahead Logging)
+We utilize `better-sqlite3`. Because the Web Engine is constantly reading (users checking dashboards) and the Traffic Agent is constantly writing (every 30 seconds), standard SQLite would encounter `SQLITE_BUSY` locks. We enforce `PRAGMA journal_mode = WAL`, allowing concurrent reads and writes.
 
-### How It Was Set Up
-1. Installed Node.js (v20) and npm.
-2. Downloaded the compiled Hysteria 2 binary to `/usr/local/bin/hysteria`.
-3. Cloned the Next.js repository.
-4. Initialized the SQLite database schemas (`users`, `vpn_configs`, `token_devices`) using `scripts/init-db.js`.
-5. Created `.env` with Google OAuth secrets and admin credentials.
-6. Bound `systemd` services to ensure the Web App, Hysteria Core, and Traffic Agent restart automatically on crashes or reboots.
-
----
-
-## 5. Cost Analysis
-
-### Current Costs: $0 / month
-Because we are utilizing the **Oracle Cloud Free Tier**, the current operational cost is strictly zero. Oracle provides generous compute instances with up to 10TB of outbound bandwidth per month for free, which is more than enough to test, launch, and host early users.
-
-### Future Costs & Scaling Estimates
-When the user base expands beyond the free tier, costs will primarily revolve around **Outbound Bandwidth (Egress)**.
-- **Compute**: Next.js and SQLite are extremely efficient. A standard $5 - $10/month VPS (from DigitalOcean, Linode, or Hetzner) can easily handle thousands of database queries and API hits.
-- **Bandwidth Costs (Standard Providers)**:
-  - Usually costs around **$0.01 per GB** (or $10 per TB) after the included quota (which is typically 1TB - 20TB depending on the host).
-  - If 100 users consume their full 30GB quota, that is 3TB of traffic.
-  - On a provider like Hetzner (20TB included), this is effectively $5/month total. On AWS/GCP, bandwidth is excessively expensive ($0.09/GB), so those platforms should be avoided for hosting VPN nodes.
+### Core Tables
+1. **`users`**: Managed by NextAuth. Stores `id`, `email`, `name`, and timestamps.
+2. **`vpn_configs`**: The core operational table.
+   - `userId` (Foreign Key -> users.id)
+   - `uuid` (The secret password Hysteria uses to authenticate)
+   - `token` (The public token used to fetch the subscription config)
+   - `totalUp` / `totalDown` (Running byte counters updated by the agent)
+   - `lastActive` (Epoch timestamp updated by the agent. If `now - lastActive < 60s`, the user is considered "Live" on the Admin panel).
+   - `expiresAt` (Epoch timestamp for the 30-day limit).
+3. **`token_devices`**: Tracks the IP addresses of devices fetching the subscription links to monitor potential link-sharing abuse.
 
 ---
 
-## 6. Node Management & Scaling
+## 4. Infrastructure & Network Setup
 
-### Current: Single-Node Architecture
-Right now, the web server, database, and VPN router exist on the exact same VPS. This is perfect for an MVP and initial growth. It is simple, extremely fast, and has zero network latency between the database and the VPN core.
+### Current Environment
+- **Host**: Oracle Cloud Infrastructure (OCI) "Always Free" Tier.
+- **Compute**: Ampere A1 (ARM64) processor.
+- **Networking**: Oracle's default Virtual Cloud Network (VCN) blocks all ports. You must explicitly open `TCP 80, 443, 3000` and `UDP 8443` in the OCI Security List, *and* open them in the local `iptables` or `ufw` firewall on the Ubuntu instance.
 
-### Future: Multi-Node Architecture (The Master/Slave Model)
-As the user base grows, we will need VPN servers in different regions (US, Europe, Asia) to provide better routing for users worldwide.
-- **The Master (Website & DB)**: The Next.js app and database will sit on one central server (or Vercel). It handles all billing, user accounts, and link generation.
-- **The Slaves (VPN Nodes)**: Cheap $5 servers spread worldwide running *only* Hysteria 2 and the Traffic Agent.
-- **Synchronization**: The Slave nodes will authenticate users by sending HTTP hooks over the internet back to the Master API. The Slave's Traffic Agent will securely `POST` traffic usage back to the Master. The Master calculates the totals and instructs the Slaves to `/kick` users when they run out of data.
-
----
-
-## 7. Future Roadmap & Monetization
-
-We have built a completely functional, automated VPN pipeline. The next phase is turning this into a highly scalable subscription-based SaaS.
-
-### Phase 1: Polishing the Product
-- **Native Desktop/Mobile Clients**: Transitioning users away from third-party apps (like Hiddify) by finishing the custom `stealthvpn-desktop` Electron/Tauri app. A seamless, one-click "Connect" button built explicitly for SpicyVPN.
-- **Better Onboarding**: Deep linking (`hiddify://`) and dashboard QR codes for zero-friction mobile installation.
-
-### Phase 2: Monetization Integration
-- **Stripe Integration**: Implement a payment wall. When a user creates an account, they get a 1-day/2GB free trial. Afterwards, they must subscribe to generate new configs.
-- **Subscription Tiers**:
-  - *Basic*: 50GB/month for $3.99.
-  - *Pro*: 200GB/month for $6.99.
-  - *Gamer*: Unlimited data, priority routing (access to premium, low-latency node regions).
-- **Crypto Payments**: Integrate a crypto gateway (like BTCPay or Coinbase Commerce) to allow privacy-conscious users to purchase bandwidth anonymously.
-
-### Phase 3: Advanced Features
-- **Node Selection**: Allow users to pick which country they want to connect to directly from their dashboard.
-- **Referral System**: Grant users +10GB of data for every friend they invite who signs up.
+### Certificate Management
+Hysteria 2 requires valid SSL certificates to successfully masquerade as HTTPS traffic.
+- Currently relies on standard `.crt` and `.key` files. 
+- **Warning**: Do not route Hysteria's `UDP 8443` traffic through Cloudflare's standard proxy. Cloudflare proxies HTTP/TCP traffic. Proxying the UDP QUIC traffic will break the tunnel. DNS must be set to "DNS Only" (Grey Cloud) for the domain pointing to the VPN core.
 
 ---
 
-*SpicyVPN is built for speed, stealth, and seamless user experience. By utilizing Hysteria 2 and a heavily optimized automated Next.js stack, we have created an enterprise-grade infrastructure with minimal overhead.*
+## 5. Cost Economics & Scaling Analysis
+
+### Current Phase: $0 / Month
+Running on Oracle's Free Tier provides immense value:
+- 4 ARM Cores / 24GB RAM (Massive overkill for Next.js + SQLite).
+- **10 TB of Outbound Bandwidth / Month (Free)**.
+
+### Growth Phase: Bandwidth is the Only Metric that Matters
+VPNs are intensely bandwidth-heavy. CPU and RAM costs are negligible. When scaling beyond Oracle, you must evaluate hosts strictly on **Egress (Outbound) pricing**.
+
+#### The Math
+If 1 user = 30GB/month. 
+1,000 active users = **30,000 GB (30 TB) of traffic**.
+
+#### Provider Comparison for 30TB of Traffic:
+- **AWS / Google Cloud**: ~$0.09 per GB = **$2,700 / month**. *(Do not use for VPNs).*
+- **DigitalOcean**: $5/mo instance includes 1TB. Overages are $0.01/GB. Cost = **$290 / month**.
+- **Hetzner**: $5/mo instance includes 20TB. Overages are ~$0.001/GB. Cost = **$15 / month**.
+- **BuyVM / Dedicated Unmetered**: Fixed ~$20 - $50 / month for 1Gbps unmetered lines.
+
+*Conclusion*: Scale using Hetzner or specialized unmetered offshore VPS providers to keep profit margins near 95%.
+
+---
+
+## 6. Multi-Node (Master/Slave) Evolution
+
+To expand globally, SpicyVPN must transition from a Single-Node setup to a Master/Slave architecture.
+
+### The Master (Central Hub)
+- Hosted centrally (e.g., Vercel or a stable VPS).
+- Runs Next.js, Stripe billing, and a scalable database (migrate from SQLite to PostgreSQL).
+- Generates links with dynamic subdomains: `us-east.spicypepper.app`, `sg.spicypepper.app`.
+
+### The Slaves (Global Edge Nodes)
+- Hosted on cheap, regional VPS servers.
+- Runs *only* Hysteria 2 and the Traffic Agent.
+- **The Handshake**:
+  1. **Auth**: The Slave's Hysteria config points its HTTP Auth Hook over the public internet back to the Master API (`https://spicypepper.app/api/node-auth`). 
+  2. **Sync**: The Slave's Traffic Agent queries its local Hysteria core, compiles the bandwidth delta, and sends an authenticated `POST` request to the Master.
+  3. **Enforcement**: The Master updates PostgreSQL, checks quotas, and responds to the Slave's POST request with a JSON array of UUIDs: `{"kick": ["uuid-1", "uuid-2"]}`. The Slave executes the kicks locally.
+
+---
+
+## 7. Product Roadmap & Monetization Strategy
+
+We have established the technical foundation. The next phases focus on commercialization and frictionless UX.
+
+### Phase 1: UX & Frictionless Onboarding
+- **Deep Linking**: Implement `hiddify://import/` protocol links. Users on mobile can tap one button on the dashboard to instantly populate their VPN client without manual copying.
+- **QR Codes**: Dynamically generate QR codes of the subscription link on the desktop dashboard for instant mobile scanning.
+- **Live User Feedback**: Reflect the `lastActive` status on the user's dashboard with a "🟢 Connected" indicator.
+
+### Phase 2: The Native Desktop Client (`stealthvpn-desktop`)
+- Build out the Tauri/Electron application. 
+- Rather than teaching users how to install Hiddify and configure "VPN Mode", the native app will:
+  1. Authenticate via NextAuth internally.
+  2. Bundle a hidden instance of the Hysteria core binary.
+  3. Provide a massive, idiot-proof "Connect" button that modifies system routing tables automatically to capture UDP game traffic.
+
+### Phase 3: SaaS Monetization (Stripe Integration)
+- Implement a rigid trial system (e.g., 2GB or 2 days free).
+- Integrate Stripe Webhooks.
+- **Tiers**:
+  - *Basic* ($3.99/mo) - 50GB Limit.
+  - *Pro* ($6.99/mo) - 200GB Limit + Ad-blocking DNS integration.
+  - *Gamer* ($9.99/mo) - Unlimited Data + Access to premium, low-latency regional nodes (e.g., specific IPs whitelisted for optimal Riot/Valve server routing).
+- **Enforcement update**: Modify `/api/vpn` to prevent regenerating free UUIDs if the user has not paid for the current billing cycle.

@@ -9,6 +9,10 @@ jobs:
   build:
     runs-on: macos-latest
 
+    defaults:
+      run:
+        working-directory: ./desktop-client
+
     steps:
     - uses: actions/checkout@v3
 
@@ -50,4 +54,4 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: SpicyVPN-macOS-Builds
-        path: dist/*.dmg
+        path: desktop-client/dist/*.dmg

@@ -27,8 +27,8 @@ jobs:
         mkdir -p app/libs
         curl -L -o app/libs/libbox.aar https://github.com/SagerNet/sing-box/releases/download/v1.10.1/libbox-1.10.1-android.aar
 
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
+    - name: Generate Gradle Wrapper
+      run: gradle wrapper --gradle-version 8.6
 
     - name: Build with Gradle
       run: ./gradlew assembleDebug --stacktrace

@@ -1,0 +1,40 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./android-client
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Inject libbox.aar (Sing-box wrapper)
+      run: |
+        mkdir -p app/libs
+        curl -L -o app/libs/libbox.aar https://github.com/SagerNet/sing-box/releases/download/v1.10.1/libbox-1.10.1-android.aar
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Build with Gradle
+      run: ./gradlew assembleDebug --stacktrace
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: SpicyVPN-Android-Debug
+        path: android-client/app/build/outputs/apk/debug/*.apk

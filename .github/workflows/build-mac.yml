@@ -43,7 +43,10 @@ jobs:
         rm -rf sing-box-arm64.tar.gz sing-box-1.10.1-darwin-arm64
 
     - name: Install Dependencies
-      run: npm install
+      run: |
+        rm -f package-lock.json
+        rm -rf node_modules
+        npm install
 
     - name: Build Mac App
       run: npm run build:mac

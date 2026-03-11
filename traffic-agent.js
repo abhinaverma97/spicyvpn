@@ -65,6 +65,14 @@ async function poll() {
 
     previousTraffic = currentTraffic;
 
+    // Cleanup memory leak (remove disconnected UUIDs from previousTraffic object)
+    const currentUuids = Object.keys(currentTraffic);
+    for (const uuid in previousTraffic) {
+      if (!currentUuids.includes(uuid)) {
+        delete previousTraffic[uuid];
+      }
+    }
+
     // Actively kick users who exceeded the quota
     if (usersToKick.length > 0) {
       try {

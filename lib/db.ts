@@ -3,18 +3,17 @@ import path from "path";
 
 const DB_PATH = path.join(process.cwd(), "prisma/dev.db");
 
-let _db: Database.Database | null = null;
-
 export function getDb(): Database.Database {
-  if (!_db) {
-    _db = new Database(DB_PATH);
-    _db.pragma("journal_mode = WAL");
-    _db.pragma("foreign_keys = ON");
+  if (!(globalThis as any)._db) {
+    const db = new Database(DB_PATH);
+    db.pragma("journal_mode = WAL");
+    db.pragma("foreign_keys = ON");
     // Add busy timeout to prevent "database is locked" errors
-    _db.pragma("busy_timeout = 5000");
-    initSchema(_db);
+    db.pragma("busy_timeout = 5000");
+    initSchema(db);
+    (globalThis as any)._db = db;
   }
-  return _db;
+  return (globalThis as any)._db;
 }
 
 function initSchema(db: Database.Database) {

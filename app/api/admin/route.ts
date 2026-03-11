@@ -18,6 +18,7 @@ export async function GET() {
     FROM users
     LEFT JOIN vpn_configs ON users.id = vpn_configs.userId
     ORDER BY users.createdAt DESC
+    LIMIT 1000
   `).all();
 
   return NextResponse.json(users);

@@ -2,7 +2,10 @@ import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import os from "os";
-import { execSync } from "child_process";
+import { exec } from "child_process";
+import { promisify } from "util";
+
+const execAsync = promisify(exec);
 
 export const dynamic = 'force-dynamic';
 
@@ -16,9 +19,10 @@ function getUptime() {
   return `${d}d ${h}h ${m}m`;
 }
 
-function getDiskUsage() {
+async function getDiskUsage() {
   try {
-    const out = execSync("df / --output=size,used,pcent | tail -1").toString().trim().split(/\s+/);
+    const { stdout } = await execAsync("df / --output=size,used,pcent | tail -1");
+    const out = stdout.trim().split(/\s+/);
     return {
       total: parseInt(out[0]) * 1024,
       used: parseInt(out[1]) * 1024,
@@ -76,6 +80,7 @@ export async function GET() {
   const totalMem = os.totalmem();
   const freeMem = os.freemem();
   const usedMem = totalMem - freeMem;
+  const diskStats = await getDiskUsage();
 
   return NextResponse.json({
     cpu: { 
@@ -88,7 +93,7 @@ export async function GET() {
       total: totalMem, 
       pct: Math.round((usedMem / totalMem) * 100) 
     },
-    disk: getDiskUsage(),
+    disk: diskStats,
     uptime: getUptime(),
     network: { rx: totalDown, tx: totalUp }, 
     connections: liveConnections,

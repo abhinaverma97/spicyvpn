@@ -5,7 +5,7 @@ const SNI = "spicypepper.app";
 const PORT = "8443";
 
 export function generateHysteriaLink(uuid: string): string {
-  return `hysteria2://${uuid}@${SERVER_IP}:${PORT}?insecure=1&sni=${SNI}#SpicyVPN`;
+  return `hysteria2://${uuid}@${SERVER_IP}:${PORT}?insecure=1&mport=20000-50000&sni=${SNI}#SpicyVPN`;
 }
 
 export function generateUUID(): string {

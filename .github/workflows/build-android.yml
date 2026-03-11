@@ -34,7 +34,7 @@ jobs:
         gomobile init
         git clone -b v1.10.1 https://github.com/SagerNet/sing-box.git
         cd sing-box
-        gomobile bind -v -a -trimpath -androidapi 21 -javapkg=io.nekohasekai -libname=box -tags with_gvisor,with_quic,with_wireguard,with_ech,with_utls,with_clash_api,with_grpc -o ../app/libs/libbox.aar ./experimental/libbox
+        gomobile bind -v -a -trimpath -androidapi 21 -javapkg=io.nekohasekai -tags with_gvisor,with_quic,with_wireguard,with_ech,with_utls,with_clash_api,with_grpc -o ../app/libs/libbox.aar ./experimental/libbox
 
     - name: Generate Gradle Wrapper
       run: gradle wrapper --gradle-version 8.6

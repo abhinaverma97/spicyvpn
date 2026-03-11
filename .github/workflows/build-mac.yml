@@ -19,7 +19,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: 18
+        node-version: 22
 
     - name: Download sing-box binaries
       run: |
@@ -46,7 +46,8 @@ jobs:
       run: |
         rm -f package-lock.json
         rm -rf node_modules
-        npm install
+        npm cache clean --force
+        npm install --force
 
     - name: Build Mac App
       run: npm run build:mac

@@ -11,11 +11,12 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 asarUnpack:
   - resources/**
+compression: maximum
 extraResources:
   - from: "resources/bin"
     to: "bin"
     filter:
-      - "**/*"
+      - "**/*.exe"
 win:
   executableName: SpicyVPN
   requestedExecutionLevel: requireAdministrator

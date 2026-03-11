@@ -24,8 +24,8 @@ import {
   Wifi,
   Clock,
   ExternalLink,
-  Activity
 } from "lucide-react";
+import Footer from "./Footer";
 
 type User = {
   id?: string;
@@ -255,8 +255,13 @@ export default function Dashboard({ user }: { user: User }) {
               </CardHeader>
               <CardContent>
                 <p className="text-base text-white/30 mb-4">By default Hiddify runs as a proxy — games and apps using UDP won&apos;t go through it. Enable <span className="text-white/60">VPN mode</span> to route all traffic.</p>
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-3 mb-4">
+                  <p className="text-sm text-amber-400">
+                    <span className="font-semibold">⚠️ Note for Chrome/Brave users:</span> Chromium-based browsers wont work. If you need to browse with Chrome, switch Hiddify back to <span className="font-semibold">System Proxy</span> mode. Else use Firefox
+                  </p>
+                </div>
                 <ol className="space-y-3 text-base text-white/40">
-                  <li>1. <span className="text-white/70">Run Hiddify as administrator</span> (right-click → Run as administrator on Windows)</li>
+                  <li>1. <span className="text-white/70 font-bold">Run Hiddify as administrator</span> (right-click → Run as administrator on Windows)</li>
                   <li className="space-y-2">
                     <span>2. On the home screen, click the <span className="text-white/70">sliders icon</span> (top-right, next to the + button)</span>
                     <img src="/hiddify-mode-step1.jpg" alt="Click sliders icon to set mode" className="rounded-lg border border-white/10 w-full max-w-sm mt-1" />
@@ -307,21 +312,21 @@ export default function Dashboard({ user }: { user: User }) {
                 <div>
                   <div className="flex items-center gap-2 mb-3">
                     <Monitor className="w-4 h-4 text-white/50" />
-                    <span className="text-lg font-medium text-white/80">Windows / Mac / Linux</span>
+                    <span className="text-lg font-medium text-white/80">Windows</span>
                     <a
-                      href="https://github.com/hiddify/hiddify-app/releases"
+                      href="https://github.com/spicyvpn365/spicyvpn/releases/download/win/windows-client.exe"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="ml-auto flex items-center gap-1.5 text-lg font-medium px-2.5 py-1 rounded-full border border-white/20 text-white/70 hover:border-white/50 hover:text-white transition-colors"
                     >
-                      Download Hiddify <ExternalLink className="w-3 h-3" />
+                      Download Client <ExternalLink className="w-3 h-3" />
                     </a>
                   </div>
                   <ol className="space-y-1.5 text-base text-white/40 ml-6">
-                    <li>1. Install <span className="text-white/70">Hiddify</span> from the link above</li>
+                    <li>1. Install the <span className="text-white/70">SpicyVPN Client</span> from the link above</li>
                     <li>2. Copy your subscription link (button above)</li>
-                    <li>3. Open Hiddify → click <span className="text-white/70">+</span> → <span className="text-white/70">Add from clipboard</span></li>
-                    <li>4. Click <span className="text-white/70">Connect</span> ✓</li>
+                    <li>3. Open the app, click the settings gear (&#9881;), and paste your link</li>
+                    <li>4. Click the large Power Button to connect ✓</li>
                   </ol>
                 </div>
 
@@ -368,6 +373,7 @@ export default function Dashboard({ user }: { user: User }) {
           </div>
         )}
       </main>
+      <Footer />
     </div>
   );
 }

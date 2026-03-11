@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
+import Footer from "./Footer";
 
 const Dither = dynamic(() => import("./Dither"), { ssr: false });
 
@@ -58,20 +59,14 @@ export default function LandingPage() {
           ) : session ? (
             "Go to dashboard →"
           ) : (
-            "Get started free"
+            "Get started for free"
           )}
         </Button>
 
         <p className="text-white/20 text-xs mt-4">{session ? session.user?.email : "No credit card required"}</p>
       </main>
 
-      {/* Footer */}
-      <footer className="relative z-10 border-t border-white/5 py-6 px-6 text-center">
-        <div className="flex items-center justify-center gap-2 text-white/20 text-xs">
-          <Shield className="w-3.5 h-3.5" />
-          <span>SpicyVPN · Private by design</span>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

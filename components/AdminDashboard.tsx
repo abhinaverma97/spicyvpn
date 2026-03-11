@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
+import Footer from "./Footer";
 
 type Stats = {
   totalUsers: number;
@@ -400,6 +401,7 @@ export default function AdminDashboard({ stats, users: initialUsers }: { stats: 
           </CardContent>
         </Card>
       </main>
+      <Footer />
     </div>
   );
 }

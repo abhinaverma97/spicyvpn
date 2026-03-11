@@ -30,12 +30,12 @@ jobs:
     - name: Build libbox.aar from source (Foolproof)
       run: |
         mkdir -p app/libs
-        go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20250210185006-b38b8813d607
-        go install golang.org/x/mobile/cmd/gobind@v0.0.0-20250210185006-b38b8813d607
+        go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20250210185054-b38b8813d607
+        go install golang.org/x/mobile/cmd/gobind@v0.0.0-20250210185054-b38b8813d607
         gomobile init
         git clone -b v1.10.1 https://github.com/SagerNet/sing-box.git
         cd sing-box
-        go get golang.org/x/mobile/bind@v0.0.0-20250210185006-b38b8813d607
+        go get golang.org/x/mobile/bind@v0.0.0-20250210185054-b38b8813d607
         gomobile bind -v -a -trimpath -androidapi 21 -javapkg=io.nekohasekai -tags with_gvisor,with_quic,with_wireguard,with_ech,with_utls,with_clash_api,with_grpc -o ../app/libs/libbox.aar ./experimental/libbox
 
     - name: Generate Gradle Wrapper

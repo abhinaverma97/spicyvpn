@@ -1,0 +1,53 @@
+name: Build macOS
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18
+
+    - name: Download sing-box binaries
+      run: |
+        mkdir -p resources/bin/mac-amd64
+        mkdir -p resources/bin/mac-arm64
+        
+        # Download amd64
+        curl -L -o sing-box-amd64.tar.gz https://github.com/SagerNet/sing-box/releases/download/v1.10.1/sing-box-1.10.1-darwin-amd64.tar.gz
+        tar -xzf sing-box-amd64.tar.gz
+        mv sing-box-1.10.1-darwin-amd64/sing-box resources/bin/mac-amd64/
+        chmod +x resources/bin/mac-amd64/sing-box
+        
+        # Download arm64
+        curl -L -o sing-box-arm64.tar.gz https://github.com/SagerNet/sing-box/releases/download/v1.10.1/sing-box-1.10.1-darwin-arm64.tar.gz
+        tar -xzf sing-box-arm64.tar.gz
+        mv sing-box-1.10.1-darwin-arm64/sing-box resources/bin/mac-arm64/
+        chmod +x resources/bin/mac-arm64/sing-box
+        
+        # Cleanup
+        rm -rf sing-box-amd64.tar.gz sing-box-1.10.1-darwin-amd64
+        rm -rf sing-box-arm64.tar.gz sing-box-1.10.1-darwin-arm64
+
+    - name: Install Dependencies
+      run: npm install
+
+    - name: Build Mac App
+      run: npm run build:mac
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload DMG Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: SpicyVPN-macOS-Builds
+        path: dist/*.dmg

@@ -24,6 +24,7 @@ import {
   Wifi,
   Clock,
   ExternalLink,
+  AlertCircle,
 } from "lucide-react";
 import Footer from "./Footer";
 
@@ -196,10 +197,10 @@ export default function Dashboard({ user }: { user: User }) {
               <Card className="bg-zinc-900 border-white/10">
                 <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
                   <span className="text-4xl font-black">
-                    {Math.max(0, (30 * 1073741824 - config.usedTraffic) / 1073741824).toFixed(1)}
+                    {(config.usedTraffic / 1073741824).toFixed(1)}
                     <span className="text-2xl text-white/40 ml-1">GB</span>
                   </span>
-                  <span className="text-sm font-medium text-white/40 uppercase tracking-wider">Data Left</span>
+                  <span className="text-sm font-medium text-white/40 uppercase tracking-wider">Data Used</span>
                 </CardContent>
               </Card>
             </div>
@@ -281,23 +282,25 @@ export default function Dashboard({ user }: { user: User }) {
 
                 <div className="border-t border-white/5" />
 
-                {/* Desktop */}
+                {/* Windows */}
                 <div>
                   <div className="flex items-center gap-2 mb-3">
                     <Monitor className="w-4 h-4 text-white/50" />
                     <span className="text-lg font-medium text-white/80">Windows</span>
                     <a
-                      href="https://github.com/spicyvpn365/spicyvpn/releases/download/win/windows-client.exe"
+                      href="https://github.com/hiddify/hiddify-app/releases/latest"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="ml-auto flex items-center gap-1.5 text-lg font-medium px-2.5 py-1 rounded-full border border-white/20 text-white/70 hover:border-white/50 hover:text-white transition-colors"
                     >
-                      Download Client <ExternalLink className="w-3 h-3" />
+                      Download Hiddify <ExternalLink className="w-3 h-3" />
                     </a>
                   </div>
                   <ol className="space-y-1.5 text-base text-white/40 ml-6">
-                    <li>1. Install the <span className="text-white/70">SpicyVPN Client</span> from the link above</li>
-                    <li>2. Open the app, paste your link and connect ✓</li>
+                    <li>1. Install <span className="text-white/70">Hiddify</span> from the link above</li>
+                    <li>2. Copy your subscription link (button above)</li>
+                    <li>3. Open Hiddify → click <span className="text-white/70">+</span> → <span className="text-white/70">Add from clipboard</span></li>
+                    <li>4. Click <span className="text-white/70">Connect</span> ✓</li>
                   </ol>
                 </div>
 
@@ -362,11 +365,6 @@ export default function Dashboard({ user }: { user: User }) {
               </CardHeader>
               <CardContent className="flex-1">
                 <p className="text-base text-white/30 mb-4">By default Hiddify runs as a proxy — games and apps using UDP won&apos;t go through it. Enable <span className="text-white/60">VPN mode</span> to route all traffic.</p>
-                <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-3 mb-4">
-                  <p className="text-sm text-amber-400">
-                    <span className="font-semibold">⚠️ Note for Chrome/Brave users:</span> Chrome/Brave might have issues, use Firefox.
-                  </p>
-                </div>
                 <ol className="space-y-3 text-base text-white/40">
                   <li>1. <span className="text-white/70 font-bold">Run Hiddify as administrator</span> (right-click → Run as administrator on Windows)</li>
                   <li className="space-y-2">
@@ -382,6 +380,13 @@ export default function Dashboard({ user }: { user: User }) {
             </Card>
 
             </div> {/* end grid */}
+
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-4 flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
+              <p className="text-base text-amber-400 font-medium">
+                Chrome/Brave might have issues, use Firefox.
+              </p>
+            </div>
 
             <div className="flex items-center gap-3 px-1">
               <Clock className="w-3.5 h-3.5 text-white/20" />

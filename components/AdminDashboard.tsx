@@ -347,7 +347,7 @@ export default function AdminDashboard({ stats, users: initialUsers }: { stats: 
                               className="h-full bg-emerald-500/50 rounded-full" 
                               style={{ 
                                 width: `${Math.min(100, (vps?.userTraffic && u.uuid && vps.userTraffic[u.uuid as string] 
-                                  ? (((vps.userTraffic[u.uuid as string].up || 0) + (vps.userTraffic[u.uuid as string].down || 0)) / (30 * 1024 * 1024 * 1024)) * 100 
+                                  ? (((vps.userTraffic[u.uuid as string].up || 0) + (vps.userTraffic[u.uuid as string].down || 0)) / (1000 * 1024 * 1024 * 1024)) * 100 
                                   : 0))}%` 
                               }} 
                             />

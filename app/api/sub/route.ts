@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
   
   const up = config.totalUp || 0;
   const down = config.totalDown || 0;
-  const totalLimit = 30 * 1024 * 1024 * 1024; // 30GB limit
+  const totalLimit = 1000 * 1024 * 1024 * 1024; // 1000GB limit
 
   return new NextResponse(encodedBody, {
     headers: {

@@ -21,28 +21,12 @@ win:
   executableName: SpicyVPN
   requestedExecutionLevel: requireAdministrator
   icon: resources/icon.png
+nsis:
   artifactName: ${name}-${version}-setup.${ext}
-  target:
-    - nsis
-extraResources:
-  - from: "resources/bin"
-    to: "bin"
-    filter:
-      - "**/*.exe"
-# Force electron-builder to only include the English locale
-# This saves about 15MB of space by stripping out 50+ unused languages.
-directories:
-  output: dist
-  buildResources: build
-files:
-  - dist/main/index.js
-  - dist/preload/index.js
-  - dist/renderer/**/*
-  - out/**/*
-  - "!**/locales/*"
-  - "**/locales/en-US.pak"
-  - "!**/*.map"
-  - "!**/*.ts"
-  - "!**/*.tsx"
-  - "!**/*.md"
-  - "!**/.vscode/*"
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: always
+npmRebuild: false
+publish:
+  provider: generic
+  url: https://example.com/auto-updates

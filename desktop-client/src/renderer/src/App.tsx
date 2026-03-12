@@ -1,39 +1,6 @@
 import React, { useState, useEffect } from 'react'
+import { Shield, ShieldCheck } from 'lucide-react'
 import Dither from './components/Dither'
-
-// Inline SVG Icons (Replacing Lucide)
-const IconShield = ({ className }: { className?: string }) => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    width="24" height="24" 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
-    className={className}
-  >
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
-  </svg>
-)
-
-const IconShieldCheck = ({ className }: { className?: string }) => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    width="24" height="24" 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
-    className={className}
-  >
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
-    <path d="m9 12 2 2 4-4" />
-  </svg>
-)
 
 function App(): React.JSX.Element {
   const [isConnected, setIsConnected] = useState(false)
@@ -136,7 +103,7 @@ function App(): React.JSX.Element {
       {/* Invisible Draggable Title Bar */}
       <div className="absolute top-0 w-full h-[38px] z-50 flex items-center px-4" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
         <div className="flex items-center gap-2 pointer-events-none opacity-40">
-          <IconShield className="w-4 h-4" />
+          <Shield className="w-4 h-4" />
           <span className="text-xs font-semibold tracking-wider">SPICY VPN</span>
         </div>
       </div>
@@ -172,34 +139,35 @@ function App(): React.JSX.Element {
         </div>
 
         {/* Connect Button */}
-        <button
-          onClick={handleToggleConnection}
-          disabled={isConnecting}
-          className={`w-full py-4 rounded-2xl font-bold text-sm tracking-wide transition-all duration-300 shadow-xl flex items-center justify-center gap-3 backdrop-blur-sm ${
-            isConnected
+        <div className="w-full relative group">
+          <button
+            onClick={handleToggleConnection}
+            disabled={isConnecting}
+            className={`w-full py-4 rounded-2xl font-bold text-sm tracking-wide transition-all duration-300 shadow-xl flex items-center justify-center gap-3 backdrop-blur-sm ${isConnected
               ? 'bg-white/10 hover:bg-white/20 text-white border border-white/30 shadow-[0_0_30px_rgba(255,255,255,0.1)]'
               : isConnecting
                 ? 'bg-black/80 border border-white/20 text-white/50 cursor-not-allowed'
                 : 'bg-white text-black hover:bg-white/90 border border-transparent'
-          }`}
-        >
-          {isConnected ? (
-            isConnecting ? 'DISCONNECTING...' : 'DISCONNECT'
-          ) : isConnecting ? (
-            'CONNECTING...'
-          ) : (
-            'CONNECT'
-          )}
-        </button>
+              }`}
+          >
+            {isConnected ? (
+              isConnecting ? 'DISCONNECTING...' : 'DISCONNECT'
+            ) : isConnecting ? (
+              'CONNECTING...'
+            ) : (
+              'CONNECT'
+            )}
+          </button>
+        </div>
 
       </main>
 
       {/* Close Prompt Modal */}
       {showClosePrompt && (
-        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-6">
+        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-6 animate-in fade-in duration-200">
           <div className="bg-black/90 border border-white/20 p-8 rounded-3xl w-full max-w-sm shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col items-center">
 
-            <IconShield className="w-12 h-12 text-white/50 mb-4" />
+            <Shield className="w-12 h-12 text-white/50 mb-4" />
 
             <h2 className="text-xl font-bold text-white mb-2 tracking-tight">Close Application?</h2>
             <p className="text-sm text-white/50 text-center mb-8 leading-relaxed">
@@ -223,7 +191,7 @@ function App(): React.JSX.Element {
 
             <label className="flex items-center justify-center gap-3 cursor-pointer group">
               <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${rememberChoice ? 'bg-white border-white' : 'bg-black border-white/30'}`}>
-                {rememberChoice && <IconShieldCheck className="w-3.5 h-3.5 text-black" />}
+                {rememberChoice && <ShieldCheck className="w-3.5 h-3.5 text-black" />}
               </div>
               <input
                 type="checkbox"

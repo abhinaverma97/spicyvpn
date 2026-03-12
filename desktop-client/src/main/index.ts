@@ -1,7 +1,6 @@
 import { app, shell, BrowserWindow, ipcMain, Tray, Menu, nativeImage } from 'electron'
 import { join } from 'path'
 import { writeFileSync, existsSync } from 'fs'
-import axios from 'axios'
 import { exec } from 'child_process'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -74,8 +73,10 @@ app.whenReady().then(() => {
 
   ipcMain.handle('save-sublink', async (_, url: string) => {
     try {
-      const res = await axios.get(url)
-      const decodedLine = Buffer.from(res.data, 'base64').toString('utf-8').trim()
+      const response = await fetch(url)
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
+      const data = await response.text()
+      const decodedLine = Buffer.from(data, 'base64').toString('utf-8').trim()
 
       // hysteria2://uuid@ip:port?insecure=1&sni=snow.com#SpicyVPN
       if (!decodedLine.startsWith('hysteria2://')) {

@@ -97,7 +97,7 @@ export default function Dashboard({ user }: { user: User }) {
 
   function daysLeft(expiresAt: string) {
     const diff = new Date(expiresAt).getTime() - Date.now();
-    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+    return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
   }
 
   const initials = user.name
@@ -197,10 +197,10 @@ export default function Dashboard({ user }: { user: User }) {
               <Card className="bg-zinc-900 border-white/10">
                 <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
                   <span className="text-4xl font-black">
-                    {(config.usedTraffic / 1073741824).toFixed(1)}
+                    {Math.max(0, (35 * 1073741824 - config.usedTraffic) / 1073741824).toFixed(1)}
                     <span className="text-2xl text-white/40 ml-1">GB</span>
                   </span>
-                  <span className="text-sm font-medium text-white/40 uppercase tracking-wider">Data Used</span>
+                  <span className="text-sm font-medium text-white/40 uppercase tracking-wider">Data Left</span>
                 </CardContent>
               </Card>
             </div>
@@ -288,18 +288,18 @@ export default function Dashboard({ user }: { user: User }) {
                     <Monitor className="w-4 h-4 text-white/50" />
                     <span className="text-lg font-medium text-white/80">Windows</span>
                     <a
-                      href="https://github.com/hiddify/hiddify-app/releases/latest"
+                      href="https://github.com/spicyvpn365/spicyvpn/releases/download/win/SpicyVPN_0.1.0_x64-setup.exe"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="ml-auto flex items-center gap-1.5 text-lg font-medium px-2.5 py-1 rounded-full border border-white/20 text-white/70 hover:border-white/50 hover:text-white transition-colors"
                     >
-                      Download Hiddify <ExternalLink className="w-3 h-3" />
+                      Download SpicyVPN <ExternalLink className="w-3 h-3" />
                     </a>
                   </div>
                   <ol className="space-y-1.5 text-base text-white/40 ml-6">
-                    <li>1. Install <span className="text-white/70">Hiddify</span> from the link above</li>
+                    <li>1. Install <span className="text-white/70">SpicyVPN</span> from the link above</li>
                     <li>2. Copy your subscription link (button above)</li>
-                    <li>3. Open Hiddify → click <span className="text-white/70">+</span> → <span className="text-white/70">Add from clipboard</span></li>
+                    <li>3. Paste the sub link in the application</li>
                     <li>4. Click <span className="text-white/70">Connect</span> ✓</li>
                   </ol>
                 </div>

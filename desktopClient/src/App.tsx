@@ -1,13 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { motion, AnimatePresence } from "framer-motion";
-import { Power, Shield, Activity, ArrowDown, ArrowUp } from "lucide-react";
+import { Power, Shield, ArrowDown, ArrowUp } from "lucide-react";
 import "./App.css";
 
 function App() {
   const [isActive, setIsActive] = useState(false);
   const [status, setStatus] = useState("Disconnected");
-  const [stats, setStats] = useState({ up: "0 B/s", down: "0 B/s" });
+  const [stats] = useState({ up: "0 B/s", down: "0 B/s" });
 
   const toggleVpn = async () => {
     try {

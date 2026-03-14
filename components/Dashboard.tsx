@@ -159,9 +159,15 @@ export default function Dashboard({ user }: { user: User }) {
             <p className="text-sm font-medium text-emerald-400">New Desktop Client Available</p>
             <p className="text-xs text-white/50">Experience a smoother, faster, and more stable connection with our dedicated native application.</p>
           </div>
-          <Button variant="ghost" size="sm" className="text-xs text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10">
-            Learn more
-          </Button>
+          <a
+            href="https://github.com/hiddify/hiddify-app/releases"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Button variant="ghost" size="sm" className="text-xs text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10">
+              Download
+            </Button>
+          </a>
         </div>
 
         <div className="mb-10">

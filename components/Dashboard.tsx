@@ -24,9 +24,16 @@ import {
   Wifi,
   Clock,
   ExternalLink,
+  Users,
+  MessageCircle,
   AlertCircle,
 } from "lucide-react";
 import Footer from "./Footer";
+import SpotlightCard from "./SpotlightCard";
+import GlassCard from "./GlassCard";
+import dynamic from "next/dynamic";
+
+const Dither = dynamic(() => import("./Dither"), { ssr: false });
 
 type User = {
   id?: string;
@@ -108,9 +115,16 @@ export default function Dashboard({ user }: { user: User }) {
     .slice(0, 2) ?? "??";
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Nav */}
-      <nav className="border-b border-white/10 px-6 py-4">
+    <div className="relative min-h-screen bg-black text-white overflow-x-hidden">
+      {/* Background Dither - Very Dim */}
+      <div className="fixed inset-0 z-0 pointer-events-none opacity-40">
+        <Dither />
+        <div className="absolute inset-0 bg-black/70" />
+      </div>
+
+      <div className="relative z-10 flex flex-col min-h-screen">
+        {/* Nav */}
+        <nav className="border-b border-white/10 px-6 py-4 backdrop-blur-md bg-black/20">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <a href="/" className="flex items-center gap-2 hover:opacity-70 transition-opacity">
             <span className="font-semibold tracking-tight">SpicyVPN</span>
@@ -150,256 +164,315 @@ export default function Dashboard({ user }: { user: User }) {
 
       {/* Main */}
       <main className="max-w-5xl mx-auto px-6 py-12">
-        {/* Desktop Client Announcement */}
-        <div className="mb-8 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
-            <Monitor className="w-4 h-4 text-emerald-400" />
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-medium text-emerald-400">New Desktop Client Available</p>
-            <p className="text-xs text-white/50">Experience a smoother, faster, and more stable connection with our dedicated native application.</p>
-          </div>
-          <a
-            href="https://github.com/spicyvpn365/spicyvpn/releases/download/win/SpicyVPN_0.1.0_x64-setup.exe"
-            target="_blank"
-            rel="noopener noreferrer"
+        {/* Desktop Client Announcement - Glass Banner */}
+        <div className="mb-8">
+          <GlassCard 
+            intensity={0.05} 
+            blur="12px" 
+            spotlightColor="transparent" 
+            className="p-4 flex items-center gap-4 border-emerald-500/10 bg-emerald-500/5"
           >
-            <Button variant="ghost" size="sm" className="text-xs text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10">
-              Download
-            </Button>
-          </a>
+            <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0 border border-emerald-500/20 shadow-lg backdrop-blur-md">
+              <Monitor className="w-5 h-5 text-emerald-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-bold text-emerald-400">New Desktop Client Available</p>
+              <p className="text-xs text-white/50 leading-relaxed">Experience a smoother, faster, and more stable connection with our dedicated native application.</p>
+            </div>
+            <a
+              href="https://github.com/spicyvpn365/spicyvpn/releases/download/win/SpicyVPN_0.1.0_x64-setup.exe"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Button variant="ghost" size="sm" className="text-xs font-bold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                Download
+              </Button>
+            </a>
+          </GlassCard>
         </div>
 
         <div className="mb-10">
-          <h1 className="text-2xl font-bold mb-1">Your VPN Access</h1>
-          <p className="text-white/40 text-base">
+          <h1 className="text-3xl font-black mb-2 tracking-tight">Your VPN Access</h1>
+          <p className="text-white/40 text-lg">
             Copy your subscription link and import it into Hiddify.
           </p>
         </div>
 
         {!config ? (
-          <Card className="bg-zinc-900 border-white/10 text-center py-16">
-            <CardContent className="flex flex-col items-center gap-6">
-              <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center">
-                <Wifi className="w-7 h-7 text-white/30" />
+          <GlassCard intensity={0.1} className="text-center py-20 border-white/5">
+            <div className="flex flex-col items-center gap-8">
+              <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center border border-white/10 shadow-2xl backdrop-blur-xl">
+                <Wifi className="w-10 h-10 text-white/30" />
               </div>
               <div>
-                <h3 className="font-semibold mb-2">No config yet</h3>
-                <p className="text-white/40 text-base mb-6">
-                  Generate your personal access link to get started.
+                <h3 className="text-xl font-bold mb-2">No config yet</h3>
+                <p className="text-white/40 text-lg mb-8 max-w-sm mx-auto">
+                  Generate your personal access link to get started with SpicyVPN.
                 </p>
+                <Button
+                  onClick={generateConfig}
+                  disabled={loading}
+                  className="bg-white/10 backdrop-blur-md text-white hover:bg-white/20 border border-white/10 px-10 py-6 text-base font-bold rounded-xl shadow-xl transition-all hover:scale-105 active:scale-95"
+                >
+                  {loading ? (
+                    <><RefreshCw className="w-5 h-5 mr-3 animate-spin" /> Generating...</>
+                  ) : (
+                    "Generate my access link"
+                  )}
+                </Button>
               </div>
-              <Button
-                onClick={generateConfig}
-                disabled={loading}
-                className="bg-white text-black hover:bg-white/90 px-8"
-              >
-                {loading ? (
-                  <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
-                ) : (
-                  "Generate my access link"
-                )}
-              </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </GlassCard>
         ) : (
-          <div className="grid gap-6">
+          <div className="grid gap-8">
 
-            {/* Stats Row */}
-            <div className="grid grid-cols-2 gap-4">
-              <Card className="bg-zinc-900 border-white/10">
-                <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
-                  <span className="text-4xl font-black">{daysLeft(config.expiresAt)}</span>
-                  <span className="text-sm font-medium text-white/40 uppercase tracking-wider">Days Remaining</span>
-                </CardContent>
-              </Card>
+            {/* Stats Row - Glass Tiles */}
+            <div className="grid grid-cols-2 gap-6">
+              <GlassCard className="p-8 flex flex-col items-center justify-center text-center space-y-3 border-white/5" intensity={0.05}>
+                <div className="text-5xl font-black tracking-tighter text-white/90 leading-none">{daysLeft(config.expiresAt)}</div>
+                <div className="text-xs font-bold text-white/30 uppercase tracking-[0.2em]">Days Remaining</div>
+              </GlassCard>
 
-              <Card className="bg-zinc-900 border-white/10">
-                <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
-                  <span className="text-4xl font-black">
-                    {Math.max(0, (35 * 1073741824 - config.usedTraffic) / 1073741824).toFixed(1)}
-                    <span className="text-2xl text-white/40 ml-1">GB</span>
-                  </span>
-                  <span className="text-sm font-medium text-white/40 uppercase tracking-wider">Data Left</span>
-                </CardContent>
-              </Card>
+              <GlassCard className="p-8 flex flex-col items-center justify-center text-center space-y-3 border-white/5" intensity={0.05}>
+                <div className="text-5xl font-black tracking-tighter text-white/90 leading-none">
+                  {Math.max(0, (35 * 1073741824 - config.usedTraffic) / 1073741824).toFixed(1)}
+                  <span className="text-2xl text-white/20 ml-1">GB</span>
+                </div>
+                <div className="text-xs font-bold text-white/30 uppercase tracking-[0.2em]">Data Left</div>
+              </GlassCard>
             </div>
 
             {/* Subscription Link */}
-            <Card className="bg-zinc-900 border-white/10 relative overflow-hidden">
-              <CardHeader className="pb-3 pt-6">
-                <div className="flex items-start sm:items-center justify-between flex-col sm:flex-row gap-2">
-                  <div>
-                    <CardTitle className="text-xl font-bold mb-1">Subscription Link</CardTitle>
-                    <CardDescription className="text-white/40 text-base">
-                      Copy this link and import it into Hiddify using <strong className="text-white/60">Add from clipboard</strong>
-                    </CardDescription>
-                  </div>
-                  <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-base shrink-0">
-                    <Check className="w-3.5 h-3.5 mr-1" /> Active
-                  </Badge>
+            <GlassCard className="p-8 space-y-6 border-white/5" intensity={0.08}>
+              <div className="flex items-start sm:items-center justify-between flex-col sm:flex-row gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-white/90 mb-1">Subscription Link</h2>
+                  <p className="text-white/40 text-base">
+                    Copy this link and import it into Hiddify using <strong className="text-white/70">Add from clipboard</strong>
+                  </p>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="bg-black rounded-lg p-4 flex items-center justify-between border border-white/10 gap-3">
-                  <code className="text-base font-mono text-white/60 break-all leading-relaxed flex-1">
+                <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 px-4 py-1.5 text-sm font-bold shrink-0">
+                  <Check className="w-4 h-4 mr-2" /> Active
+                </Badge>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="bg-black/40 rounded-xl p-5 flex items-center justify-between border border-white/5 gap-4 backdrop-blur-md">
+                  <code className="text-base font-mono text-white/50 break-all leading-relaxed flex-1">
                     {subUrl()}
                   </code>
                   <button
                     onClick={copySubUrl}
-                    className="shrink-0 text-white/40 hover:text-white transition-colors"
+                    className="shrink-0 text-white/30 hover:text-white transition-colors p-2 hover:bg-white/5 rounded-lg"
                   >
-                    {copiedSub ? <Check className="w-5 h-5 text-emerald-400" /> : <Copy className="w-5 h-5" />}
+                    {copiedSub ? <Check className="w-6 h-6 text-emerald-400" /> : <Copy className="w-6 h-6" />}
                   </button>
                 </div>
                 <Button
                   onClick={copySubUrl}
-                  className="w-full bg-white text-black hover:bg-white/90 font-medium py-6 text-lg"
+                  className="w-full bg-white/10 backdrop-blur-md text-white hover:bg-white/20 border border-white/10 font-black py-7 text-lg rounded-xl shadow-2xl transition-all transform active:scale-[0.98]"
                 >
                   {copiedSub ? (
-                    <><Check className="w-5 h-5 mr-2" /> Copied!</>
+                    <><Check className="w-6 h-6 mr-3 text-emerald-400" /> Copied to clipboard!</>
                   ) : (
-                    <><Copy className="w-5 h-5 mr-2" /> Copy subscription link</>
+                    <><Copy className="w-6 h-6 mr-3 text-white/60" /> Copy subscription link</>
                   )}
                 </Button>
-              </CardContent>
-            </Card>
+              </div>
+            </GlassCard>
 
-            {/* Games + How to connect — side by side on desktop */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+            {/* Guides Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
 
             {/* How to connect */}
-            <Card className="bg-zinc-900 border-white/10 flex flex-col h-full">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-medium">How to connect</CardTitle>
-                <CardDescription className="text-white/40 text-base">
-                  Use <span className="text-white/70 font-semibold">Hiddify</span> — free, open-source, works on all platforms
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6 flex-1">
-
+            <GlassCard className="flex flex-col h-full border-white/5" intensity={0.05}>
+              <div className="p-8 pb-4">
+                <h3 className="text-xl font-bold text-white/90 mb-1">How to connect</h3>
+                <p className="text-white/40 text-base">
+                  Use <span className="text-white/70 font-bold underline decoration-white/20">Hiddify</span> — free, open-source, works on all platforms
+                </p>
+              </div>
+              
+              <div className="p-8 pt-0 space-y-8">
                 {/* Android */}
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Smartphone className="w-4 h-4 text-white/50" />
-                    <span className="text-lg font-medium text-white/80">Android</span>
+                <div className="group/item">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center border border-white/10 group-hover/item:border-white/20 transition-colors">
+                      <Smartphone className="w-4 h-4 text-white/40" />
+                    </div>
+                    <span className="text-lg font-bold text-white/80">Android</span>
                     <a
                       href="https://play.google.com/store/apps/details?id=app.hiddify.com"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="ml-auto flex items-center gap-1.5 text-lg font-medium px-2.5 py-1 rounded-full border border-white/20 text-white/70 hover:border-white/50 hover:text-white transition-colors"
+                      className="ml-auto text-sm font-bold px-4 py-2 rounded-xl border border-white/10 text-white/50 hover:border-white/30 hover:text-white transition-all bg-white/5"
                     >
-                      Google Play <ExternalLink className="w-3 h-3" />
+                      Google Play
                     </a>
                   </div>
-                  <ol className="space-y-1.5 text-base text-white/40 ml-6">
-                    <li>1. Install <span className="text-white/70">Hiddify</span> from Google Play</li>
-                    <li>2. Copy your subscription link (button above)</li>
-                    <li>3. Open Hiddify → tap <span className="text-white/70">+</span> → <span className="text-white/70">Add from clipboard</span></li>
-                    <li>4. Tap <span className="text-white/70">Connect</span> ✓</li>
+                  <ol className="space-y-2 text-base text-white/30 ml-4 border-l border-white/5 pl-6">
+                    <li>1. Install <span className="text-white/60 font-medium">Hiddify</span> from Play Store</li>
+                    <li>2. Copy your link from the box above</li>
+                    <li>3. Open Hiddify → tap <span className="text-white/60 font-medium">+</span> → <span className="text-white/60 font-medium">Add from clipboard</span></li>
+                    <li>4. Tap <span className="text-white/60 font-medium text-emerald-400">Connect</span> ✓</li>
                   </ol>
                 </div>
 
                 <div className="border-t border-white/5" />
 
                 {/* Windows */}
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Monitor className="w-4 h-4 text-white/50" />
-                    <span className="text-lg font-medium text-white/80">Windows</span>
+                <div className="group/item">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center border border-white/10 group-hover/item:border-white/20 transition-colors">
+                      <Monitor className="w-4 h-4 text-white/40" />
+                    </div>
+                    <span className="text-lg font-bold text-white/80">Windows</span>
                     <a
                       href="https://github.com/spicyvpn365/spicyvpn/releases/download/win/SpicyVPN_0.1.0_x64-setup.exe"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="ml-auto flex items-center gap-1.5 text-lg font-medium px-2.5 py-1 rounded-full border border-white/20 text-white/70 hover:border-white/50 hover:text-white transition-colors"
+                      className="ml-auto text-sm font-bold px-4 py-2 rounded-xl border border-white/10 text-white/50 hover:border-white/30 hover:text-white transition-all bg-white/5"
                     >
-                      Download SpicyVPN <ExternalLink className="w-3 h-3" />
+                      Download App
                     </a>
                   </div>
-                  <ol className="space-y-1.5 text-base text-white/40 ml-6">
-                    <li>1. Install <span className="text-white/70">SpicyVPN</span> from the link above</li>
-                    <li>2. Copy your subscription link (button above)</li>
-                    <li>3. Paste the sub link in the application</li>
-                    <li>4. Click <span className="text-white/70">Connect</span> ✓</li>
+                  <ol className="space-y-2 text-base text-white/30 ml-4 border-l border-white/5 pl-6">
+                    <li>1. Download and install <span className="text-white/60 font-medium">SpicyVPN</span></li>
+                    <li>2. Copy your subscription link</li>
+                    <li>3. Paste the link into the application</li>
+                    <li>4. Click <span className="text-white/60 font-medium text-emerald-400">Connect</span> ✓</li>
                   </ol>
                 </div>
 
                 <div className="border-t border-white/5" />
 
                 {/* macOS */}
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Monitor className="w-4 h-4 text-white/50" />
-                    <span className="text-lg font-medium text-white/80">macOS</span>
+                <div className="group/item">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center border border-white/10 group-hover/item:border-white/20 transition-colors">
+                      <Monitor className="w-4 h-4 text-white/40" />
+                    </div>
+                    <span className="text-lg font-bold text-white/80">macOS</span>
                     <a
                       href="https://github.com/hiddify/hiddify-app/releases/download/v4.1.1/Hiddify-MacOS.dmg"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="ml-auto flex items-center gap-1.5 text-lg font-medium px-2.5 py-1 rounded-full border border-white/20 text-white/70 hover:border-white/50 hover:text-white transition-colors"
+                      className="ml-auto text-sm font-bold px-4 py-2 rounded-xl border border-white/10 text-white/50 hover:border-white/30 hover:text-white transition-all bg-white/5"
                     >
-                      Download Hiddify <ExternalLink className="w-3 h-3" />
+                      Download Hiddify
                     </a>
                   </div>
-                  <ol className="space-y-1.5 text-base text-white/40 ml-6">
-                    <li>1. Install <span className="text-white/70">Hiddify</span> from the link above</li>
-                    <li>2. Copy your subscription link (button above)</li>
-                    <li>3. Open Hiddify → click <span className="text-white/70">+</span> → <span className="text-white/70">Add from clipboard</span></li>
-                    <li>4. Click <span className="text-white/70">Connect</span> ✓</li>
+                  <ol className="space-y-2 text-base text-white/30 ml-4 border-l border-white/5 pl-6">
+                    <li>1. Install <span className="text-white/60 font-medium">Hiddify</span> for Mac</li>
+                    <li>2. Copy your link, open Hiddify and click <span className="text-white/60 font-medium">+</span></li>
+                    <li>3. Select <span className="text-white/60 font-medium">Add from clipboard</span></li>
+                    <li>4. Click <span className="text-white/60 font-medium text-emerald-400">Connect</span> ✓</li>
                   </ol>
                 </div>
 
                 <div className="border-t border-white/5" />
 
                 {/* iOS */}
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Smartphone className="w-4 h-4 text-white/50" />
-                    <span className="text-lg font-medium text-white/80">iPhone / iPad</span>
+                <div className="group/item">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center border border-white/10 group-hover/item:border-white/20 transition-colors">
+                      <Smartphone className="w-4 h-4 text-white/40" />
+                    </div>
+                    <span className="text-lg font-bold text-white/80">iPhone / iPad</span>
                     <a
                       href="https://apps.apple.com/app/hiddify-proxy-vpn/id6596777532"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="ml-auto flex items-center gap-1.5 text-lg font-medium px-2.5 py-1 rounded-full border border-white/20 text-white/70 hover:border-white/50 hover:text-white transition-colors"
+                      className="ml-auto text-sm font-bold px-4 py-2 rounded-xl border border-white/10 text-white/50 hover:border-white/30 hover:text-white transition-all bg-white/5"
                     >
-                      App Store <ExternalLink className="w-3 h-3" />
+                      App Store
                     </a>
                   </div>
-                  <ol className="space-y-1.5 text-base text-white/40 ml-6">
-                    <li>1. Install <span className="text-white/70">Hiddify</span> from the App Store</li>
-                    <li>2. Copy your subscription link (button above)</li>
-                    <li>3. Open Hiddify → tap <span className="text-white/70">+</span> → <span className="text-white/70">Add from clipboard</span></li>
-                    <li>4. Tap <span className="text-white/70">Connect</span> ✓</li>
+                  <ol className="space-y-2 text-base text-white/30 ml-4 border-l border-white/5 pl-6">
+                    <li>1. Get <span className="text-white/60 font-medium">Hiddify</span> from App Store</li>
+                    <li>2. Copy your link and import it into the app</li>
+                    <li>3. Tap <span className="text-white/60 font-medium text-emerald-400">Connect</span> ✓</li>
                   </ol>
                 </div>
-
-                <div className="border-t border-white/5" />
-
-              </CardContent>
-            </Card>
+              </div>
+            </GlassCard>
 
             {/* Games & System Apps */}
-            <Card className="bg-zinc-900 border-white/10 flex flex-col h-full">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-medium">🎮 For games & system apps</CardTitle>
-                <CardDescription className="text-white/40 text-base">Discord, Valorant, and any UDP app — enable VPN mode for full system routing</CardDescription>
-              </CardHeader>
-              <CardContent className="flex-1">
-                <p className="text-base text-white/30 mb-4">By default Hiddify runs as a proxy — games and apps using UDP won&apos;t go through it. Enable <span className="text-white/60">VPN mode</span> to route all traffic.</p>
-                <ol className="space-y-3 text-base text-white/40">
-                  <li>1. <span className="text-white/70 font-bold">Run Hiddify as administrator</span> (right-click → Run as administrator on Windows)</li>
-                  <li className="space-y-2">
-                    <span>2. On the home screen, click the <span className="text-white/70">sliders icon</span> (top-right, next to the + button)</span>
-                    <img src="/hiddify-mode-step1.jpg" alt="Click sliders icon to set mode" className="rounded-lg border border-white/10 w-full max-w-sm mt-1" />
+            <GlassCard className="flex flex-col h-full border-white/5" intensity={0.05}>
+              <div className="p-8 pb-4">
+                <h3 className="text-xl font-bold text-white/90 mb-1">🎮 For games & system apps</h3>
+                <p className="text-white/40 text-base leading-relaxed">Discord, Valorant, and any UDP app — enable VPN mode for full system routing</p>
+              </div>
+              <div className="p-8 pt-0 space-y-6 flex-1">
+                <p className="text-base text-white/30 leading-relaxed italic border-l-2 border-white/10 pl-4">
+                  By default Hiddify runs as a proxy — games and apps using UDP won&apos;t go through it. 
+                  Enable <span className="text-white/60 font-bold">VPN mode</span> to route all traffic.
+                </p>
+                <ol className="space-y-6 text-base text-white/40">
+                  <li className="flex gap-4">
+                    <span className="shrink-0 w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-xs font-bold border border-white/10">1</span>
+                    <span><span className="text-white/70 font-bold">Run Hiddify as administrator</span> (Right-click on desktop icon)</span>
                   </li>
-                  <li>3. Select <span className="text-white/70">VPN</span> from the mode options (Proxy / System proxy / VPN / VPN service)
-                    <img src="/hiddify-mode-step2.jpg" alt="Select VPN mode" className="rounded-lg border border-white/10 w-full max-w-sm mt-2" />
+                  <li className="space-y-3">
+                    <div className="flex gap-4">
+                      <span className="shrink-0 w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-xs font-bold border border-white/10">2</span>
+                      <span>Click the <span className="text-white/70 font-bold">sliders icon</span> (top-right, next to the + button)</span>
+                    </div>
+                    <div className="ml-10 relative group/img">
+                      <div className="absolute -inset-1 bg-white/10 rounded-xl blur opacity-0 group-hover/img:opacity-100 transition-opacity"></div>
+                      <img src="/hiddify-mode-step1.jpg" alt="Click sliders icon" className="relative rounded-lg border border-white/10 w-full max-w-sm" />
+                    </div>
                   </li>
-                  <li>4. Connect as usual — all apps now route through SpicyVPN ✓</li>
+                  <li className="space-y-3">
+                    <div className="flex gap-4">
+                      <span className="shrink-0 w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-xs font-bold border border-white/10">3</span>
+                      <span>Select <span className="text-white/70 font-bold">VPN</span> from the mode options</span>
+                    </div>
+                    <div className="ml-10 relative group/img">
+                      <div className="absolute -inset-1 bg-white/10 rounded-xl blur opacity-0 group-hover/img:opacity-100 transition-opacity"></div>
+                      <img src="/hiddify-mode-step2.jpg" alt="Select VPN mode" className="relative rounded-lg border border-white/10 w-full max-w-sm" />
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="shrink-0 w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-xs font-bold border border-white/10">4</span>
+                    <span className="text-white/40">Connect as usual — all apps now route through SpicyVPN ✓</span>
+                  </li>
                 </ol>
-              </CardContent>
-            </Card>
+              </div>
+            </GlassCard>
 
             </div> {/* end grid */}
+
+            {/* Reddit Community Card - Premium Glass Style */}
+            <GlassCard 
+              spotlightColor="transparent" 
+              className="p-8 flex flex-col md:flex-row items-center justify-between gap-8 border-white/5"
+              intensity={0.05}
+              blur="16px"
+            >
+              <div className="flex items-center gap-6 text-center md:text-left flex-col md:flex-row">
+                <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center shrink-0 border border-white/10 shadow-xl backdrop-blur-md">
+                  <Users className="w-8 h-8 text-white/60" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-2xl font-bold tracking-tight text-white/90">Reddit Community</h3>
+                  <p className="text-base text-white/40 max-w-lg leading-relaxed">
+                    Join our official subreddit for support, updates, and community discussions. 
+                    Share your experience and get help from our community.
+                  </p>
+                </div>
+              </div>
+              <a
+                href="https://www.reddit.com/r/spicyvpn/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full md:w-auto"
+              >
+                <Button className="w-full md:w-auto bg-white/10 backdrop-blur-md text-white/80 hover:text-white hover:bg-white/20 border border-white/10 hover:border-orange-500/50 font-bold h-14 px-10 text-base transition-all duration-300 rounded-xl group">
+                  Join r/spicyvpn
+                  <ExternalLink className="w-4 h-4 ml-2 text-white/40 group-hover:text-orange-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+                </Button>
+              </a>            </GlassCard>
 
             <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-4 flex items-center gap-3">
               <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
@@ -421,6 +494,7 @@ export default function Dashboard({ user }: { user: User }) {
         )}
       </main>
       <Footer />
+      </div>
     </div>
   );
 }

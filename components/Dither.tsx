@@ -136,7 +136,7 @@ export default function Dither() {
     gl.uniform1f(uCI, 4.0);
     gl.uniform1f(uAmp, 0.3);
     gl.uniform1f(uFreq, 3.0);
-    gl.uniform1f(uSpeed, 0.05);
+    gl.uniform1f(uSpeed, 0.15);
     gl.uniform1f(uMouseR, 0.3);
 
     let mouseX = 0, mouseY = 0;

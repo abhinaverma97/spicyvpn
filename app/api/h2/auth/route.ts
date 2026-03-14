@@ -3,7 +3,7 @@ import { getDb } from "@/lib/db";
 
 export const dynamic = 'force-dynamic';
 
-const TRAFFIC_LIMIT = 1000 * 1024 * 1024 * 1024; // 1000GB (Effectively disabled for now, was 30GB)
+const TRAFFIC_LIMIT = 35 * 1024 * 1024 * 1024; // 35GB
 
 export async function POST(req: NextRequest) {
   try {

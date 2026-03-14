@@ -41,9 +41,9 @@ type VpsStats = {
 };
 
 function fmt(bytes: number) {
-  if (bytes >= 1e9) return (bytes / 1e9).toFixed(1) + " GB";
-  if (bytes >= 1e6) return (bytes / 1e6).toFixed(1) + " MB";
-  return (bytes / 1e3).toFixed(0) + " KB";
+  if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(1) + " GB";
+  if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + " MB";
+  return (bytes / 1024).toFixed(0) + " KB";
 }
 
 function StatBar({ pct, color = "bg-white" }: { pct: number; color?: string }) {
@@ -81,7 +81,7 @@ export default function AdminDashboard({ stats, users: initialUsers }: { stats: 
 
   function daysLeft(expiresAt: string) {
     const diff = new Date(expiresAt).getTime() - Date.now();
-    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+    return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
   }
 
   const usedPct = Math.round((stats.totalUsers / stats.capacity) * 100);
@@ -347,7 +347,7 @@ export default function AdminDashboard({ stats, users: initialUsers }: { stats: 
                               className="h-full bg-emerald-500/50 rounded-full" 
                               style={{ 
                                 width: `${Math.min(100, (vps?.userTraffic && u.uuid && vps.userTraffic[u.uuid as string] 
-                                  ? (((vps.userTraffic[u.uuid as string].up || 0) + (vps.userTraffic[u.uuid as string].down || 0)) / (1000 * 1024 * 1024 * 1024)) * 100 
+                                  ? (((vps.userTraffic[u.uuid as string].up || 0) + (vps.userTraffic[u.uuid as string].down || 0)) / (35 * 1024 * 1024 * 1024)) * 100 
                                   : 0))}%` 
                               }} 
                             />

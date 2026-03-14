@@ -5,7 +5,7 @@ const path = require('path');
 const DB_PATH = path.join(__dirname, 'prisma/dev.db');
 const HYSTERIA_API_URL = "http://127.0.0.1:8080";
 const INTERVAL_MS = 30000; // 30 seconds
-const TRAFFIC_LIMIT = 1000 * 1024 * 1024 * 1024; // 1000GB in bytes
+const TRAFFIC_LIMIT = 35 * 1024 * 1024 * 1024; // 35GB in bytes
 
 // Open the database
 const db = new Database(DB_PATH);

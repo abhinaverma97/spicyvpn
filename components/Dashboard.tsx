@@ -160,7 +160,7 @@ export default function Dashboard({ user }: { user: User }) {
             <p className="text-xs text-white/50">Experience a smoother, faster, and more stable connection with our dedicated native application.</p>
           </div>
           <a
-            href="https://github.com/hiddify/hiddify-app/releases"
+            href="https://github.com/spicyvpn365/spicyvpn/releases/download/win/SpicyVPN_0.1.0_x64-setup.exe"
             target="_blank"
             rel="noopener noreferrer"
           >

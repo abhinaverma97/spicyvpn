@@ -150,6 +150,20 @@ export default function Dashboard({ user }: { user: User }) {
 
       {/* Main */}
       <main className="max-w-5xl mx-auto px-6 py-12">
+        {/* Desktop Client Announcement */}
+        <div className="mb-8 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+            <Monitor className="w-4 h-4 text-emerald-400" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-emerald-400">New Desktop Client Available</p>
+            <p className="text-xs text-white/50">Experience a smoother, faster, and more stable connection with our dedicated native application.</p>
+          </div>
+          <Button variant="ghost" size="sm" className="text-xs text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10">
+            Learn more
+          </Button>
+        </div>
+
         <div className="mb-10">
           <h1 className="text-2xl font-bold mb-1">Your VPN Access</h1>
           <p className="text-white/40 text-base">

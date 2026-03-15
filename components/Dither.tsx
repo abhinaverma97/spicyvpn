@@ -98,7 +98,7 @@ function compileShader(gl: WebGLRenderingContext, type: number, src: string) {
   return s;
 }
 
-export default function Dither() {
+export default function Dither({ speed = 0.05 }: { speed?: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -136,7 +136,7 @@ export default function Dither() {
     gl.uniform1f(uCI, 4.0);
     gl.uniform1f(uAmp, 0.3);
     gl.uniform1f(uFreq, 3.0);
-    gl.uniform1f(uSpeed, 0.15);
+    gl.uniform1f(uSpeed, speed);
     gl.uniform1f(uMouseR, 0.3);
 
     let mouseX = 0, mouseY = 0;

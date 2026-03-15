@@ -115,10 +115,10 @@ export default function Dashboard({ user }: { user: User }) {
     .slice(0, 2) ?? "??";
 
   return (
-    <div className="relative min-h-screen bg-black text-white overflow-x-hidden">
+    <div className="relative min-h-screen bg-black text-white overflow-x-hidden no-scrollbar">
       {/* Background Dither - Very Dim */}
       <div className="fixed inset-0 z-0 pointer-events-none opacity-40">
-        <Dither />
+        <Dither speed={0.15} />
         <div className="absolute inset-0 bg-black/70" />
       </div>
 
@@ -314,7 +314,7 @@ export default function Dashboard({ user }: { user: User }) {
                     <li>1. Install <span className="text-white/60 font-medium">Hiddify</span> from Play Store</li>
                     <li>2. Copy your link from the box above</li>
                     <li>3. Open Hiddify → tap <span className="text-white/60 font-medium">+</span> → <span className="text-white/60 font-medium">Add from clipboard</span></li>
-                    <li>4. Tap <span className="text-white/60 font-medium text-emerald-400">Connect</span> ✓</li>
+                    <li>4. Tap <span className="text-white/60 font-medium">Connect</span></li>
                   </ol>
                 </div>
 
@@ -340,7 +340,7 @@ export default function Dashboard({ user }: { user: User }) {
                     <li>1. Download and install <span className="text-white/60 font-medium">SpicyVPN</span></li>
                     <li>2. Copy your subscription link</li>
                     <li>3. Paste the link into the application</li>
-                    <li>4. Click <span className="text-white/60 font-medium text-emerald-400">Connect</span> ✓</li>
+                    <li>4. Click <span className="text-white/60 font-medium">Connect</span></li>
                   </ol>
                 </div>
 
@@ -366,7 +366,7 @@ export default function Dashboard({ user }: { user: User }) {
                     <li>1. Install <span className="text-white/60 font-medium">Hiddify</span> for Mac</li>
                     <li>2. Copy your link, open Hiddify and click <span className="text-white/60 font-medium">+</span></li>
                     <li>3. Select <span className="text-white/60 font-medium">Add from clipboard</span></li>
-                    <li>4. Click <span className="text-white/60 font-medium text-emerald-400">Connect</span> ✓</li>
+                    <li>4. Click <span className="text-white/60 font-medium">Connect</span></li>
                   </ol>
                 </div>
 
@@ -391,7 +391,7 @@ export default function Dashboard({ user }: { user: User }) {
                   <ol className="space-y-2 text-base text-white/30 ml-4 border-l border-white/5 pl-6">
                     <li>1. Get <span className="text-white/60 font-medium">Hiddify</span> from App Store</li>
                     <li>2. Copy your link and import it into the app</li>
-                    <li>3. Tap <span className="text-white/60 font-medium text-emerald-400">Connect</span> ✓</li>
+                    <li>3. Tap <span className="text-white/60 font-medium">Connect</span></li>
                   </ol>
                 </div>
               </div>
@@ -435,7 +435,7 @@ export default function Dashboard({ user }: { user: User }) {
                   </li>
                   <li className="flex gap-4">
                     <span className="shrink-0 w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-xs font-bold border border-white/10">4</span>
-                    <span className="text-white/40">Connect as usual — all apps now route through SpicyVPN ✓</span>
+                    <span className="text-white/60">Connect as usual — all apps now route through SpicyVPN</span>
                   </li>
                 </ol>
               </div>

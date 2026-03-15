@@ -52,10 +52,10 @@ export default function LandingPage() {
             }
           }}
           disabled={loading}
-          className="bg-white text-black hover:bg-white/90 px-8 py-3 rounded-full font-semibold text-sm"
+          className="bg-white/10 backdrop-blur-md text-white hover:bg-white/20 border border-white/10 px-10 py-7 rounded-2xl font-bold text-base shadow-2xl transition-all hover:scale-105 active:scale-95"
         >
           {loading ? (
-            <span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+            <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
           ) : session ? (
             "Go to dashboard →"
           ) : (

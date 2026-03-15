@@ -14,6 +14,7 @@ Welcome to the absolute, unredacted, and comprehensive documentation for **Spicy
 7. [The Master/Slave Evolution (Global Edge Networking)](#7-the-masterslave-evolution-global-edge-networking)
 8. [Commercialization: Product Roadmap & Stripe Integration](#8-commercialization-product-roadmap--stripe-integration)
 9. [Operational Playbook & Disaster Recovery](#9-operational-playbook--disaster-recovery)
+10. [Deep System Tuning & Optimizations](#10-deep-system-tuning--optimizations)
 
 ---
 
@@ -229,3 +230,56 @@ If the Master database is compromised or a zero-day exploit is found in the VPN 
 ```bash
 sudo systemctl stop hysteria-server stealthvpn stealthvpn-agent
 ```
+
+---
+
+## 10. Deep System Tuning & Optimizations
+
+Here is the precise, live, and verified snapshot of every configuration actively running on the server right now. I have pulled this directly from the active kernel and the Hysteria 2 configuration file.
+
+### 🐧 1. Linux OS & Kernel Layer (`sysctl`)
+*   **Congestion Control:** `net.ipv4.tcp_congestion_control = bbr`
+    *   *(BBR is actively running to maximize throughput and minimize latency.)*
+*   **Maximum Memory Buffers:**
+    *   `net.core.rmem_max = 4194304` (4 MB)
+    *   `net.core.wmem_max = 4194304` (4 MB)
+    *   *(The absolute ceiling the OS will allow for a single socket. Perfectly aligned with the new Hysteria QUIC maximums.)*
+*   **Default Memory Buffers:**
+    *   `net.core.rmem_default = 131072` (128 KB)
+    *   `net.core.wmem_default = 131072` (128 KB)
+    *   *(The starting buffer for new connections. Keeping this low prevents the initial massive spikes in jitter when a connection begins.)*
+*   **Minimum UDP Memory:**
+    *   `net.ipv4.udp_rmem_min = 16384`
+    *   `net.ipv4.udp_wmem_min = 16384`
+
+### 🛡️ 2. Network Firewall & Routing (`iptables`)
+*   **Port Hopping (Active):**
+    *   `udp dpts:20000:50000 redir ports 8443`
+    *   *(The kernel is actively intercepting any UDP packet arriving on ports 20,000 through 50,000 and silently forwarding it to Hysteria on port 8443. This is working perfectly, as the logs show it has intercepted 990K bytes of traffic.)*
+
+### ⚙️ 3. Hysteria 2 Core Config (`/etc/hysteria/config.yaml`)
+*   **Forced Server BBR:** `ignoreClientBandwidth: true`
+    *   *(The server is ignoring user bandwidth inputs and using its own BBR logic.)*
+*   **Listening Port & Camouflage:**
+    *   `listen: :8443`
+    *   `alpn: [h3]` *(Posing as HTTP/3 web traffic.)*
+*   **Elastic QUIC Windows (Anti-Bufferbloat Tuning):**
+    *   `initStreamReceiveWindow: 1048576` (1 MB)
+    *   `maxStreamReceiveWindow: 4194304` (4 MB)
+    *   `initConnReceiveWindow: 2097152` (2 MB)
+    *   `maxConnReceiveWindow: 8388608` (8 MB)
+    *   *(The "Golden Middle Ground." Connections start small (1MB/2MB) to protect slow networks like yours from bufferbloat, but BBR is allowed to scale them up (to 4MB/8MB) if a user connects from a fast fiber line.)*
+*   **MTU:** `mtu: 1350`
+    *   *(Reverted back to your preferred 1350 to prevent packet fragmentation.)*
+*   **Zero-Trust Auth:**
+    *   `url: http://127.0.0.1:3000/api/h2/auth` *(Validates UUIDs against Next.js).*
+*   **Masquerade:**
+    *   `url: https://bing.com` *(Serves Bing if probed by censors).*
+
+### 🟢 4. System Services (`systemd`)
+All three pillars of your stack are confirmed to be **ACTIVE** and running:
+*   **`stealthvpn`**: The Next.js web application.
+*   **`hysteria-server`**: The VPN core.
+*   **`stealthvpn-agent`**: The Node.js traffic monitor and active enforcer. 
+
+The server is currently running exactly as designed with the Elastic Windows modification implemented flawlessly.

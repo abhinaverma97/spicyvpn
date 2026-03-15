@@ -267,8 +267,8 @@ Here is the precise, live, and verified snapshot of every configuration actively
     *   `initStreamReceiveWindow: 1048576` (1 MB)
     *   `maxStreamReceiveWindow: 4194304` (4 MB)
     *   `initConnReceiveWindow: 2097152` (2 MB)
-    *   `maxConnReceiveWindow: 8388608` (8 MB)
-    *   *(The "Golden Middle Ground." Connections start small (1MB/2MB) to protect slow networks like yours from bufferbloat, but BBR is allowed to scale them up (to 4MB/8MB) if a user connects from a fast fiber line.)*
+    *   `maxConnReceiveWindow: 4194304` (4 MB)
+    *   *(The "Golden Middle Ground." Connections start small (1MB/2MB) to protect slow networks like yours from bufferbloat, but BBR is allowed to scale them up (to 4MB) if a user connects from a fast fiber line.)*
 *   **MTU:** `mtu: 1350`
     *   *(Reverted back to your preferred 1350 to prevent packet fragmentation.)*
 *   **Zero-Trust Auth:**

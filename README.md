@@ -1,6 +1,6 @@
 # 🌶️ SpicyVPN (StealthVPN) - The Definitive Technical Whitepaper & Operations Manual
 
-Welcome to the absolute, unredacted, and comprehensive documentation for **SpicyVPN** (internally codenamed StealthVPN). This document is designed for systems architects, network engineers, and business operators. It covers the granular mechanics of the network protocols, the full computational lifecycle of the application stack, the micro-economics of global bandwidth scaling, and the complete multi-year roadmap for converting this platform into a high-margin, enterprise-grade SaaS.
+Welcome to the absolute, unredacted, and comprehensive documentation for **SpicyVPN** (internally codenamed StealthVPN). This document is designed for systems architects, network engineers, and business operators. It covers the granular mechanics of the network protocols, the full computational lifecycle of the application stack, and the complete multi-year roadmap for converting this platform into a high-margin, enterprise-grade SaaS.
 
 ---
 
@@ -10,11 +10,9 @@ Welcome to the absolute, unredacted, and comprehensive documentation for **Spicy
 3. [Compute Layer: Architecture & The "Trinity" System](#3-compute-layer-architecture--the-trinity-system)
 4. [Data Layer: SQLite, WAL, and Schema Mechanics](#4-data-layer-sqlite-wal-and-schema-mechanics)
 5. [Infrastructure & Bare-Metal Configuration](#5-infrastructure--bare-metal-configuration)
-6. [Unit Economics, Bandwidth Arbitrage, & Scaling Costs](#6-unit-economics-bandwidth-arbitrage--scaling-costs)
-7. [The Master/Slave Evolution (Global Edge Networking)](#7-the-masterslave-evolution-global-edge-networking)
-8. [Commercialization: Product Roadmap & Stripe Integration](#8-commercialization-product-roadmap--stripe-integration)
-9. [Operational Playbook & Disaster Recovery](#9-operational-playbook--disaster-recovery)
-10. [Deep System Tuning & Optimizations](#10-deep-system-tuning--optimizations)
+6. [The Master/Slave Evolution (Global Edge Networking)](#6-the-masterslave-evolution-global-edge-networking)
+7. [Operational Playbook & Disaster Recovery](#7-operational-playbook--disaster-recovery)
+8. [Deep System Tuning & Optimizations](#8-deep-system-tuning--optimizations)
 
 ---
 
@@ -132,42 +130,7 @@ The entire stack is bound to `systemd` to ensure 100% uptime, automatic restarts
 
 ---
 
-## 6. Unit Economics, Bandwidth Arbitrage, & Scaling Costs
-
-VPN economics are fundamentally different from standard web SaaS. CPU, RAM, and Storage costs approach $0. The only metric that dictates profitability is **Egress Bandwidth Pricing**.
-
-### Scenario: 1,000 Active Users maxing out 30GB/mo = 30 Terabytes (30,000 GB).
-
-#### The "Do Not Use" Tier (Hyperscalers)
-- **AWS / Google Cloud (GCP) / Azure**:
-  - Cost per GB: ~$0.09.
-  - Cost for 30TB: **$2,700 / month**.
-  - *Verdict: Financial suicide. Never deploy VPN nodes on hyperscalers.*
-
-#### The "Mid-Tier" (Standard Cloud)
-- **DigitalOcean / Vultr / Linode**:
-  - Base instance: $5/mo (includes 1TB).
-  - Overage Cost per GB: $0.01.
-  - Cost for 30TB: **$295 / month**.
-  - *Verdict: Acceptable for early scaling, but eats into margins.*
-
-#### The "Arbitrage Tier" (European & Offshore Providers)
-- **Hetzner Cloud (Germany/US/Finland)**:
-  - Base instance: €4.50/mo.
-  - Included Bandwidth: **20 Terabytes**.
-  - Overage Cost per GB: €0.001 (1/10th of a cent).
-  - Cost for 30TB: **~$15 / month**.
-  - *Verdict: The ultimate scaling target.*
-- **BuyVM (Luxembourg/Las Vegas)**:
-  - Base instance: $15/mo.
-  - Included Bandwidth: **Unmetered 1Gbps line** (~330TB theoretical max).
-  - Cost for 30TB: **$15 / month**.
-
-*Business Conclusion: By transitioning from Oracle to Hetzner/BuyVM, we can support 1,000 users for under $20/month in infrastructure costs. At a $5/month subscription price, 1,000 users generate $5,000 MRR. Profit margins scale to >99%.*
-
----
-
-## 7. The Master/Slave Evolution (Global Edge Networking)
+## 6. The Master/Slave Evolution (Global Edge Networking)
 
 To transition from a single server to a globally distributed VPN network (e.g., nodes in Singapore, Frankfurt, New York, Tokyo), the architecture must shift to a **Master/Slave topology**.
 
@@ -186,32 +149,7 @@ To transition from a single server to a globally distributed VPN network (e.g., 
 
 ---
 
-## 8. Commercialization: Product Roadmap & Stripe Integration
-
-### Phase 1: UX Hyper-Optimization
-- **Frictionless Mobile Onboarding**: Generate a massive QR code on the desktop dashboard. Users open Hiddify, scan the screen, and connect in 3 seconds. No copy-pasting required.
-- **Deep Linking Intents**: Format subscription buttons as `hiddify://import/spicypepper.app/api/sub?token=...`. Clicking it on a phone instantly launches the app and imports the profile.
-- **Live Websocket Dashboard**: Migrate the Admin panel to use WebSockets or Server-Sent Events (SSE) for millisecond-accurate live connection blinking, rather than 30-second polling.
-
-### Phase 2: The Native Application (`stealthvpn-desktop`)
-- **The Tauri/Electron App**: Third-party clients (Hiddify/v2rayN) are powerful but complex. We will compile a native Windows/macOS executable.
-- **Embedded Binary**: The app will bundle the Hysteria client binary within its executable.
-- **Zero-Config Workflow**: Users log in via Google inside the app. The app fetches the config silently and provides a massive, single "Power Button".
-- **OS Routing Manipulation**: The app will natively manipulate Windows `ipconfig` and macOS `pf` routing tables to intercept UDP game traffic automatically (bypassing the need for users to manually configure "TUN/VPN Mode").
-
-### Phase 3: SaaS Billing & Automation (Stripe)
-- **The Funnel**:
-  1. User signs in with Google -> Automatically granted a 2-day / 2GB trial configuration.
-  2. Upon exhaustion, the QUIC tunnel is severed, and the subscription link updates to a generic redirect profile directing them to the billing page.
-- **Subscription Tiers**:
-  - **Spicy Basic ($3.99/mo)**: 50GB Egress Quota. 2 Device Limit.
-  - **Spicy Pro ($6.99/mo)**: 250GB Egress Quota. 5 Device Limit. Ad-blocking DNS injected.
-  - **Spicy Infinite ($12.99/mo)**: Unlimited Quota. Access to "Premium" routing nodes (whitelist IPs mapped specifically to Riot Games/Valve data centers for minimum latency).
-- **Webhooks**: Stripe webhook endpoints (`POST /api/webhooks/stripe`) will listen for `invoice.payment_succeeded` and instantly execute an `UPDATE vpn_configs SET expiresAt = ...` to restore service without manual intervention.
-
----
-
-## 9. Operational Playbook & Disaster Recovery
+## 7. Operational Playbook & Disaster Recovery
 
 ### Log Auditing Commands
 - **Web Engine Logs**: `sudo journalctl -u stealthvpn -f`
@@ -233,9 +171,9 @@ sudo systemctl stop hysteria-server stealthvpn stealthvpn-agent
 
 ---
 
-## 10. Deep System Tuning & Optimizations
+## 8. Deep System Tuning & Optimizations
 
-Here is the precise, live, and verified snapshot of every configuration actively running on the server right now. I have pulled this directly from the active kernel and the Hysteria 2 configuration file.
+Here is the precise, live, and verified snapshot of every configuration actively running on the server right now.
 
 ### 🐧 1. Linux OS & Kernel Layer (`sysctl`)
 *   **Congestion Control:** `net.ipv4.tcp_congestion_control = bbr`
@@ -243,7 +181,7 @@ Here is the precise, live, and verified snapshot of every configuration actively
 *   **Maximum Memory Buffers:**
     *   `net.core.rmem_max = 4194304` (4 MB)
     *   `net.core.wmem_max = 4194304` (4 MB)
-    *   *(The absolute ceiling the OS will allow for a single socket. Perfectly aligned with the new Hysteria QUIC maximums.)*
+    *   *(The absolute ceiling the OS will allow for a single socket. Aligned with QUIC maximums.)*
 *   **Default Memory Buffers:**
     *   `net.core.rmem_default = 131072` (128 KB)
     *   `net.core.wmem_default = 131072` (128 KB)
@@ -255,7 +193,7 @@ Here is the precise, live, and verified snapshot of every configuration actively
 ### 🛡️ 2. Network Firewall & Routing (`iptables`)
 *   **Port Hopping (Active):**
     *   `udp dpts:20000:50000 redir ports 8443`
-    *   *(The kernel is actively intercepting any UDP packet arriving on ports 20,000 through 50,000 and silently forwarding it to Hysteria on port 8443. This is working perfectly, as the logs show it has intercepted 990K bytes of traffic.)*
+    *   *(The kernel is actively intercepting any UDP packet arriving on ports 20,000 through 50,000 and silently forwarding it to Hysteria on port 8443.)*
 
 ### ⚙️ 3. Hysteria 2 Core Config (`/etc/hysteria/config.yaml`)
 *   **Forced Server BBR:** `ignoreClientBandwidth: true`
@@ -268,9 +206,13 @@ Here is the precise, live, and verified snapshot of every configuration actively
     *   `maxStreamReceiveWindow: 4194304` (4 MB)
     *   `initConnReceiveWindow: 2097152` (2 MB)
     *   `maxConnReceiveWindow: 4194304` (4 MB)
-    *   *(The "Golden Middle Ground." Connections start small (1MB/2MB) to protect slow networks like yours from bufferbloat, but BBR is allowed to scale them up (to 4MB) if a user connects from a fast fiber line.)*
+    *   *(Connections start small (1MB/2MB) to protect slow networks from bufferbloat, but BBR is allowed to scale them up (to 4MB) if a user connects from a fast line.)*
 *   **MTU:** `mtu: 1350`
-    *   *(Reverted back to your preferred 1350 to prevent packet fragmentation.)*
+    *   *(Forced at 1350 to prevent packet fragmentation, specifically optimizing UDP traffic for low-latency gaming.)*
+*   **IPv6 Blackhole Remediation (Forced IPv4):**
+    *   `outbounds: [ {name: ipv4_only, type: direct, direct: {mode: "4"}} ]`
+    *   `acl: inline: [ - ipv4_only(all) ]`
+    *   *(Intercepts all outbound requests and forces them exclusively over IPv4 to prevent blackholing on networks lacking IPv6 routing.)*
 *   **Zero-Trust Auth:**
     *   `url: http://127.0.0.1:3000/api/h2/auth` *(Validates UUIDs against Next.js).*
 *   **Masquerade:**
@@ -280,6 +222,4 @@ Here is the precise, live, and verified snapshot of every configuration actively
 All three pillars of your stack are confirmed to be **ACTIVE** and running:
 *   **`stealthvpn`**: The Next.js web application.
 *   **`hysteria-server`**: The VPN core.
-*   **`stealthvpn-agent`**: The Node.js traffic monitor and active enforcer. 
-
-The server is currently running exactly as designed with the Elastic Windows modification implemented flawlessly.
+*   **`stealthvpn-agent`**: The Node.js traffic monitor and active enforcer.

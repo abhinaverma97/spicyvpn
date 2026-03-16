@@ -5,7 +5,9 @@ const SNI = "spicypepper.app";
 const PORT = "8443";
 
 export function generateHysteriaLink(uuid: string): string {
-  return `hysteria2://${uuid}@${SERVER_IP}:${PORT}?insecure=1&mport=20000-50000&sni=${SNI}#SpicyVPN`;
+  // We include upmbps=0 and downmbps=0 to tell the client to disable pacing
+  // and let the server's BBR congestion control handle the speeds.
+  return `hysteria2://${uuid}@${SERVER_IP}:${PORT}?insecure=1&mport=20000-50000&upmbps=0&downmbps=0&sni=${SNI}#SpicyVPN`;
 }
 
 export function generateUUID(): string {

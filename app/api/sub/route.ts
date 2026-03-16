@@ -41,16 +41,14 @@ export async function GET(req: NextRequest) {
     console.error("Device tracking failed:", e);
   }
 
-  // Generate Hysteria 2 config
-  const hysteriaLink = generateHysteriaLink(config.uuid);
+  const payload = generateHysteriaLink(config.uuid);
+  const finalBody = Buffer.from(payload).toString("base64");
 
-  const encodedBody = Buffer.from(hysteriaLink).toString("base64");
-  
   const up = config.totalUp || 0;
   const down = config.totalDown || 0;
   const totalLimit = 35 * 1024 * 1024 * 1024; // 35GB limit
 
-  return new NextResponse(encodedBody, {
+  return new NextResponse(finalBody, {
     headers: {
       "Content-Type": "text/plain; charset=utf-8",
       "Profile-Title": "SpicyVPN",

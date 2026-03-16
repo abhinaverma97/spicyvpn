@@ -38,8 +38,7 @@ export default function LandingPage() {
         </h1>
 
         <p className="text-white/40 text-lg max-w-md mb-10 leading-relaxed">
-          A private tunnel that looks like nothing at all.
-          One link. Works everywhere.
+          Experience the bleeding edge of stealth technology with uncompromising low latency.
         </p>
 
         <Button
@@ -52,7 +51,7 @@ export default function LandingPage() {
             }
           }}
           disabled={loading}
-          className="bg-white/10 backdrop-blur-md text-white hover:bg-white/20 border border-white/10 px-10 py-7 rounded-2xl font-bold text-base shadow-2xl transition-all hover:scale-105 active:scale-95"
+          className="bg-white/5 backdrop-blur-lg text-white/90 hover:bg-white/10 hover:text-white px-8 py-5 rounded-lg font-bold text-sm transition-all duration-300 border border-white/10 hover:border-white/20 active:scale-[0.98] shadow-2xl"
         >
           {loading ? (
             <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

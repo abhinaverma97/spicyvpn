@@ -116,9 +116,9 @@ export default function Dashboard({ user }: { user: User }) {
 
   return (
     <div className="relative min-h-screen bg-black text-white overflow-x-hidden no-scrollbar">
-      {/* Background Dither - Very Dim */}
-      <div className="fixed inset-0 z-0 pointer-events-none opacity-40">
-        <Dither speed={0.15} />
+      {/* Background Dither - Very Dim (Hidden on Mobile) */}
+      <div className="fixed inset-0 z-0 pointer-events-none opacity-40 hidden sm:block">
+        <Dither />
         <div className="absolute inset-0 bg-black/70" />
       </div>
 
@@ -176,7 +176,7 @@ export default function Dashboard({ user }: { user: User }) {
               <Monitor className="w-5 h-5 text-emerald-400" />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-bold text-emerald-400">New Desktop Client Available</p>
+              <p className="text-sm font-bold text-emerald-400">New Desktop Client Available (13th March)</p>
               <p className="text-xs text-white/50 leading-relaxed">Experience a smoother, faster, and more stable connection with our dedicated native application.</p>
             </div>
             <a
@@ -279,6 +279,37 @@ export default function Dashboard({ user }: { user: User }) {
                   )}
                 </Button>
               </div>
+            </GlassCard>
+
+            {/* WhatsApp Community Card - Premium Glass Style */}
+            <GlassCard 
+              spotlightColor="transparent" 
+              className="p-8 flex flex-col md:flex-row items-center justify-between gap-8 border-white/5"
+              intensity={0.05}
+              blur="16px"
+            >
+              <div className="flex items-center gap-6 text-center md:text-left flex-col md:flex-row">
+                <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center shrink-0 border border-white/10 shadow-xl backdrop-blur-md">
+                  <MessageCircle className="w-8 h-8 text-white/60" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-2xl font-bold tracking-tight text-white/90">WhatsApp Community</h3>
+                  <p className="text-base text-white/40 max-w-lg leading-relaxed">
+                    Join our official WhatsApp group for real-time support, updates, and community discussions. 
+                  </p>
+                </div>
+              </div>
+              <a
+                href="https://chat.whatsapp.com/GbbhA373kNtFQwqvXItwZF"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full md:w-auto"
+              >
+                <Button className="w-full md:w-auto bg-white/[0.03] hover:bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:border-emerald-400/50 font-bold h-14 px-10 text-base transition-all duration-300 rounded-xl group backdrop-blur-md">
+                  Join WhatsApp Community
+                  <ExternalLink className="w-4 h-4 ml-2 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform opacity-50 group-hover:opacity-100" />
+                </Button>
+              </a>
             </GlassCard>
 
             {/* Guides Row */}
@@ -398,7 +429,7 @@ export default function Dashboard({ user }: { user: User }) {
             </GlassCard>
 
             {/* Games & System Apps */}
-            <GlassCard className="flex flex-col h-full border-white/5" intensity={0.05}>
+            <GlassCard className="hidden md:flex flex-col h-full border-white/5" intensity={0.05}>
               <div className="p-8 pb-4">
                 <h3 className="text-xl font-bold text-white/90 mb-1">🎮 For games & system apps</h3>
                 <p className="text-white/40 text-base leading-relaxed">Discord, Valorant, and any UDP app — enable VPN mode for full system routing</p>
@@ -442,37 +473,6 @@ export default function Dashboard({ user }: { user: User }) {
             </GlassCard>
 
             </div> {/* end grid */}
-
-            {/* Reddit Community Card - Premium Glass Style */}
-            <GlassCard 
-              spotlightColor="transparent" 
-              className="p-8 flex flex-col md:flex-row items-center justify-between gap-8 border-white/5"
-              intensity={0.05}
-              blur="16px"
-            >
-              <div className="flex items-center gap-6 text-center md:text-left flex-col md:flex-row">
-                <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center shrink-0 border border-white/10 shadow-xl backdrop-blur-md">
-                  <Users className="w-8 h-8 text-white/60" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-2xl font-bold tracking-tight text-white/90">Reddit Community</h3>
-                  <p className="text-base text-white/40 max-w-lg leading-relaxed">
-                    Join our official subreddit for support, updates, and community discussions. 
-                    Share your experience and get help from our community.
-                  </p>
-                </div>
-              </div>
-              <a
-                href="https://www.reddit.com/r/spicyvpn/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full md:w-auto"
-              >
-                <Button className="w-full md:w-auto bg-white/10 backdrop-blur-md text-white/80 hover:text-white hover:bg-white/20 border border-white/10 hover:border-orange-500/50 font-bold h-14 px-10 text-base transition-all duration-300 rounded-xl group">
-                  Join r/spicyvpn
-                  <ExternalLink className="w-4 h-4 ml-2 text-white/40 group-hover:text-orange-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
-                </Button>
-              </a>            </GlassCard>
 
             <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-4 flex items-center gap-3">
               <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />

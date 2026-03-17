@@ -170,13 +170,13 @@ export default function Dashboard({ user }: { user: User }) {
             intensity={0.05} 
             blur="12px" 
             spotlightColor="transparent" 
-            className="p-4 flex items-center gap-4 border-emerald-500/10 bg-emerald-500/5"
+            className="p-4 flex items-center gap-4 border-blue-500/10 bg-blue-500/5"
           >
-            <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0 border border-emerald-500/20 shadow-lg backdrop-blur-md">
-              <Monitor className="w-5 h-5 text-emerald-400" />
+            <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0 border border-blue-500/20 shadow-lg backdrop-blur-md">
+              <Monitor className="w-5 h-5 text-blue-400" />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-bold text-emerald-400">New Desktop Client Available (13th March)</p>
+              <p className="text-sm font-bold text-blue-400">New Desktop Client Version 2 Available (17th March)</p>
               <p className="text-xs text-white/50 leading-relaxed">Experience a smoother, faster, and more stable connection with our dedicated native application.</p>
             </div>
             <a
@@ -184,7 +184,7 @@ export default function Dashboard({ user }: { user: User }) {
               target="_blank"
               rel="noopener noreferrer"
             >
-              <Button variant="ghost" size="sm" className="text-xs font-bold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+              <Button variant="ghost" size="sm" className="text-xs font-bold text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 border border-blue-500/20 rounded-lg">
                 Download
               </Button>
             </a>

@@ -28,7 +28,7 @@ export default function LandingPage() {
       <main className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-6 py-24">
         <div className="inline-flex items-center gap-2 text-xs text-white/40 border border-white/10 rounded-full px-4 py-1.5 mb-8 backdrop-blur-sm">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          Stealth encrypted · No logs
+          Peak Gaming Experience
         </div>
 
         <h1 className="text-5xl sm:text-7xl font-black tracking-tighter leading-none mb-6 max-w-3xl">

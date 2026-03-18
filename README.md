@@ -177,11 +177,11 @@ Here is the precise, live, and verified snapshot of every configuration actively
 
 ### 🐧 1. Linux OS & Kernel Layer (`sysctl`)
 *   **Congestion Control:** `net.ipv4.tcp_congestion_control = bbr`
-    *   *(BBR is actively running to maximize throughput and minimize latency.)*
+    *   *(BBR is enabled at the OS layer, but the VPN core utilizes Brutal for precise bandwidth pacing.)*
 *   **Maximum Memory Buffers:**
-    *   `net.core.rmem_max = 4194304` (4 MB)
-    *   `net.core.wmem_max = 4194304` (4 MB)
-    *   *(The absolute ceiling the OS will allow for a single socket. Aligned with QUIC maximums.)*
+    *   `net.core.rmem_max = 33554432` (32 MB)
+    *   `net.core.wmem_max = 33554432` (32 MB)
+    *   *(The absolute ceiling the OS will allow for a single socket. Massively expanded to support Brutal's pacing requirements.)*
 *   **Default Memory Buffers:**
     *   `net.core.rmem_default = 131072` (128 KB)
     *   `net.core.wmem_default = 131072` (128 KB)
@@ -196,17 +196,18 @@ Here is the precise, live, and verified snapshot of every configuration actively
     *   *(The kernel is actively intercepting any UDP packet arriving on ports 20,000 through 50,000 and silently forwarding it to Hysteria on port 8443.)*
 
 ### ⚙️ 3. Hysteria 2 Core Config (`/etc/hysteria/config.yaml`)
-*   **Forced Server BBR:** `ignoreClientBandwidth: true`
-    *   *(The server is ignoring user bandwidth inputs and using its own BBR logic.)*
+*   **Forced Server-Side Brutal Pacing:** 
+    *   `bandwidth: up: 9 mbps, down: 9 mbps`
+    *   *(The server actively enforces a strict 9 Mbps Brutal pacing limit on every client. This mathematically prevents bufferbloat by ensuring the VPN never outpaces the user's physical connection.)*
 *   **Listening Port & Camouflage:**
     *   `listen: :8443`
     *   `alpn: [h3]` *(Posing as HTTP/3 web traffic.)*
-*   **Elastic QUIC Windows (Anti-Bufferbloat Tuning):**
-    *   `initStreamReceiveWindow: 1048576` (1 MB)
-    *   `maxStreamReceiveWindow: 4194304` (4 MB)
-    *   `initConnReceiveWindow: 2097152` (2 MB)
-    *   `maxConnReceiveWindow: 4194304` (4 MB)
-    *   *(Connections start small (1MB/2MB) to protect slow networks from bufferbloat, but BBR is allowed to scale them up (to 4MB) if a user connects from a fast line.)*
+*   **Massive QUIC Windows (Brutal Runway):**
+    *   `initStreamReceiveWindow: 8388608` (8 MB)
+    *   `maxStreamReceiveWindow: 8388608` (8 MB)
+    *   `initConnReceiveWindow: 20971520` (20 MB)
+    *   `maxConnReceiveWindow: 20971520` (20 MB)
+    *   *(Unlike BBR, Brutal requires massive "runway" buffers to perfectly pace packets without hitting an application wall. These windows are kept enormous to guarantee zero jitter.)*
 *   **MTU:** `mtu: 1350`
     *   *(Forced at 1350 to prevent packet fragmentation, specifically optimizing UDP traffic for low-latency gaming.)*
 *   **IPv6 Blackhole Remediation (Forced IPv4):**

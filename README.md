@@ -66,22 +66,27 @@ SpicyVPN is not a monolithic application. It is a highly decoupled trinity of se
   - Base64 encodes the Hysteria config: `hysteria2://uuid@ip:8443?insecure=1&sni=spicypepper.app#SpicyVPN`.
   - Injects `Subscription-Userinfo: upload=X; download=Y; total=Z` headers to natively sync data caps with the client's UI.
 
-### II. The VPN Router (`hysteria-server.service`)
-- **Role**: The data plane. A compiled Golang binary running natively on the host Linux kernel.
-- **Network Stack**: Listens on `UDP 8443` for the encrypted QUIC tunnels.
-- **Internal REST API**: Binds exclusively to `127.0.0.1:8080`.
-  - `GET /traffic`: Returns a map of all connected IDs and their exact `tx` (transmit) and `rx` (receive) byte counts since the server started.
-  - `POST /kick`: Accepts a JSON array of IDs `["uuid-1234"]` to instantly sever live QUIC connections.
+### II. The VPN Routers (Dual-Server Architecture)
+- **Role**: The data plane. We run two concurrent Golang binaries (Hysteria 2) to serve different use-cases.
+- **Server A (Daily Driver)**: 
+  - Listens on `UDP 8443`.
+  - Uses BBR congestion control with tight windows for general high-speed web browsing.
+  - Internal REST API binds to `127.0.0.1:8080`.
+- **Server B (Gaming Mode)**:
+  - Listens on `UDP 8444`.
+  - Uses Brutal pacing locked at a thin 2 Mbps to bypass Wi-Fi bufferbloat and guarantee zero packet loss for games like Valorant.
+  - Internal REST API binds to `127.0.0.1:8081`.
+- **API Endpoints**: Both servers expose `GET /traffic` and `POST /kick` to the local loopback.
 
 ### III. The Enforcer (`stealthvpn-agent.service` / Node.js)
 - **Role**: The asynchronous reconciliation loop.
 - **Execution Loop**: Every 30,000 milliseconds (30 seconds):
-  1. Executes HTTP GET to Hysteria's `localhost:8080/traffic`.
-  2. Compares the new payload array against an in-memory cached copy of the previous payload.
-  3. Calculates the exact `tx` and `rx` delta for every active UUID.
+  1. Executes HTTP GET to both Hysteria instances (`localhost:8080/traffic` and `localhost:8081/traffic`).
+  2. Aggregates the data, comparing the new payload arrays against an in-memory cached copy.
+  3. Calculates the exact `tx` and `rx` delta for every active UUID across both servers.
   4. Commits an `UPDATE vpn_configs SET totalUp = totalUp + rx, totalDown = totalDown + tx, lastActive = (unixepoch())` to SQLite.
   5. Executes a `SELECT` to verify the user hasn't breached the 30GB limit or their timestamp limit.
-  6. If breached, it immediately executes an HTTP POST to Hysteria's `/kick` API. The user is disconnected mid-stream and cannot reconnect (blocked by the Auth Hook).
+  6. If breached, it immediately executes an HTTP POST to the `/kick` API on **both** servers simultaneously. The user is disconnected mid-stream and cannot reconnect.
 
 ---
 
@@ -195,32 +200,35 @@ Here is the precise, live, and verified snapshot of every configuration actively
     *   `udp dpts:20000:50000 redir ports 8443`
     *   *(The kernel is actively intercepting any UDP packet arriving on ports 20,000 through 50,000 and silently forwarding it to Hysteria on port 8443.)*
 
-### ⚙️ 3. Hysteria 2 Core Config (`/etc/hysteria/config.yaml`)
-*   **Forced Server-Side Brutal Pacing:** 
-    *   `bandwidth: up: 9 mbps, down: 9 mbps`
-    *   *(The server actively enforces a strict 9 Mbps Brutal pacing limit on every client. This mathematically prevents bufferbloat by ensuring the VPN never outpaces the user's physical connection.)*
-*   **Listening Port & Camouflage:**
-    *   `listen: :8443`
-    *   `alpn: [h3]` *(Posing as HTTP/3 web traffic.)*
-*   **Massive QUIC Windows (Brutal Runway):**
-    *   `initStreamReceiveWindow: 8388608` (8 MB)
-    *   `maxStreamReceiveWindow: 8388608` (8 MB)
+### ⚙️ 3. Hysteria 2 Core Configs (Dual Setup)
+The server runs two concurrent instances of Hysteria to serve distinct network needs.
+
+**Server A (Daily Driver - `/etc/hysteria/config.yaml`)**:
+*   **Listening Port**: `8443`
+*   **Congestion Control (BBR)**: `ignoreClientBandwidth: true`
+    *   *(Forces BBR auto-pilot for all connections. Ideal for high-throughput downloads and general browsing.)*
+*   **Ultra-Tight QUIC Windows (Bufferbloat Fix)**:
+    *   `initStreamReceiveWindow: 262144` (256 KB)
+    *   `maxConnReceiveWindow: 1048576` (1 MB)
+    *   *(These "straitjacket" limits physically prevent BBR from overwhelming crowded Wi-Fi networks.)*
+
+**Server B (Gaming Mode - `/etc/hysteria/gaming.yaml`)**:
+*   **Listening Port**: `8444`
+*   **Congestion Control (Brutal)**: `bandwidth: up: 2 mbps, down: 2 mbps`
+    *   *(Forces an ultra-thin 2 Mbps pacing limit. This makes the gaming stream practically invisible to hostel network policers and ensures zero packet loss.)*
+*   **Massive QUIC Windows (Brutal Runway)**:
     *   `initConnReceiveWindow: 20971520` (20 MB)
-    *   `maxConnReceiveWindow: 20971520` (20 MB)
-    *   *(Unlike BBR, Brutal requires massive "runway" buffers to perfectly pace packets without hitting an application wall. These windows are kept enormous to guarantee zero jitter.)*
-*   **MTU:** `mtu: 1350`
-    *   *(Forced at 1350 to prevent packet fragmentation, specifically optimizing UDP traffic for low-latency gaming.)*
-*   **IPv6 Blackhole Remediation (Forced IPv4):**
-    *   `outbounds: [ {name: ipv4_only, type: direct, direct: {mode: "4"}} ]`
-    *   `acl: inline: [ - ipv4_only(all) ]`
-    *   *(Intercepts all outbound requests and forces them exclusively over IPv4 to prevent blackholing on networks lacking IPv6 routing.)*
-*   **Zero-Trust Auth:**
-    *   `url: http://127.0.0.1:3000/api/h2/auth` *(Validates UUIDs against Next.js).*
-*   **Masquerade:**
-    *   `url: https://bing.com` *(Serves Bing if probed by censors).*
+    *   *(Unlike BBR, Brutal requires massive windows to perfectly pace packets without hitting an application wall.)*
+
+**Global Settings (Both Servers)**:
+*   **MTU:** `mtu: 1350` *(Prevents packet fragmentation.)*
+*   **ALPN Camouflage:** `alpn: [h3]` *(Posing as HTTP/3 web traffic.)*
+*   **IPv6 Blackhole Remediation:** Forces all outbound requests over IPv4.
+*   **Zero-Trust Auth:** Validates UUIDs against the Next.js API hook.
 
 ### 🟢 4. System Services (`systemd`)
-All three pillars of your stack are confirmed to be **ACTIVE** and running:
+All components of your stack are confirmed to be **ACTIVE** and running:
 *   **`stealthvpn`**: The Next.js web application.
-*   **`hysteria-server`**: The VPN core.
+*   **`hysteria-server`**: The VPN core (Daily use).
+*   **`hysteria-gaming`**: The VPN core (Low-latency gaming use).
 *   **`stealthvpn-agent`**: The Node.js traffic monitor and active enforcer.

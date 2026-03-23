@@ -7,20 +7,13 @@ const TRAFFIC_LIMIT = 35 * 1024 * 1024 * 1024; // 35GB
 
 export async function POST(req: NextRequest) {
   try {
-    const { auth, apiKey } = await req.json();
+    const { auth } = await req.json();
     
-    if (!auth || !apiKey) {
-      return NextResponse.json({ ok: false, error: "Missing auth or apiKey" }, { status: 400 });
+    if (!auth) {
+      return NextResponse.json({ ok: false, error: "Missing auth" }, { status: 400 });
     }
 
     const db = getDb();
-    
-    // Verify Node API Key
-    const node = db.prepare(`SELECT * FROM nodes WHERE apiKey = ? AND status = 'active'`).get(apiKey);
-    if (!node) {
-      return NextResponse.json({ ok: false, error: "Invalid Node API Key" }, { status: 403 });
-    }
-
     const now = Math.floor(Date.now() / 1000);
 
     // 1. Find the config in our DB

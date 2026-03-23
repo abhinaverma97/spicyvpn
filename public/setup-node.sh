@@ -43,9 +43,18 @@ echo "* hard nofile 1048576" >> /etc/security/limits.conf
 echo "fs.file-max = 1048576" >> /etc/sysctl.conf
 sysctl -p
 
-echo "3. Configuring iptables Port Hopping..."
+echo "3. Configuring iptables Port Hopping and Firewall..."
 apt-get update && apt-get install -y iptables-persistent
+
+# Allow incoming traffic on the primary port
+iptables -I INPUT 6 -m state --state NEW -p udp --dport 8443 -j ACCEPT
+
+# Allow incoming traffic on the port hopping range
+iptables -I INPUT 6 -m state --state NEW -p udp --dport 20000:50000 -j ACCEPT
+
+# Set up the NAT redirect for port hopping
 iptables -t nat -A PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports 8443
+
 netfilter-persistent save
 
 echo "4. Installing Hysteria 2..."

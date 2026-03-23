@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Shield, Users, Wifi, Clock, AlertCircle, Cpu, HardDrive, Activity, ArrowDown, ArrowUp, Trash2 } from "lucide-react";
+import { Shield, Users, Wifi, Clock, AlertCircle, Cpu, HardDrive, Activity, ArrowDown, ArrowUp, Trash2, Server, Plus, Power, Key } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { signOut } from "next-auth/react";
@@ -26,6 +26,18 @@ type User = {
   expiresAt: string | null;
   active: boolean;
   deviceCount: number;
+};
+
+type Node = {
+  id: string;
+  name: string;
+  ip: string;
+  apiKey: string;
+  maxCapacity: number;
+  currentLoad: number;
+  status: string;
+  lastHeartbeat: number;
+  createdAt: number;
 };
 
 type VpsStats = {
@@ -56,10 +68,17 @@ function StatBar({ pct, color = "bg-white" }: { pct: number; color?: string }) {
 
 export default function AdminDashboard({ stats, users: initialUsers }: { stats: Stats; users: User[] }) {
   const [users, setUsers] = useState<User[]>(initialUsers);
+  const [nodes, setNodes] = useState<Node[]>([]);
   const [vps, setVps] = useState<VpsStats | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [sortByLive, setSortByLive] = useState(false);
+  
+  // Node UI State
+  const [showAddNode, setShowAddNode] = useState(false);
+  const [newNodeName, setNewNodeName] = useState("");
+  const [newNodeIp, setNewNodeIp] = useState("");
+  const [installCommand, setInstallCommand] = useState("");
 
   async function deleteUser(id: string) {
     setDeleting(id);
@@ -69,15 +88,61 @@ export default function AdminDashboard({ stats, users: initialUsers }: { stats: 
     setConfirmId(null);
   }
 
+  async function fetchNodes() {
+    const res = await fetch("/api/admin/nodes");
+    if (res.ok) setNodes(await res.json());
+  }
+
   useEffect(() => {
     async function fetchVps() {
       const res = await fetch("/api/admin/stats");
       if (res.ok) setVps(await res.json());
     }
     fetchVps();
-    const interval = setInterval(fetchVps, 30000);
+    fetchNodes();
+    const interval = setInterval(() => {
+        fetchVps();
+        fetchNodes();
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  async function handleAddNode(e: React.FormEvent) {
+    e.preventDefault();
+    const res = await fetch("/api/admin/nodes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newNodeName, ip: newNodeIp })
+    });
+    
+    if (res.ok) {
+      const data = await res.json();
+      const domain = window.location.origin;
+      const cmd = `sudo bash -c "curl -sSL ${domain}/setup-node.sh | bash -s -- '${domain}' '${data.apiKey}'"`;
+      setInstallCommand(cmd);
+      fetchNodes();
+    }
+  }
+
+  async function toggleNodeStatus(id: string, currentStatus: string) {
+    const newStatus = currentStatus === 'active' ? 'disabled' : 'active';
+    await fetch("/api/admin/nodes", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status: newStatus })
+    });
+    fetchNodes();
+  }
+
+  async function deleteNode(id: string) {
+    if (!confirm("Are you sure you want to delete this node?")) return;
+    await fetch("/api/admin/nodes", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id })
+    });
+    fetchNodes();
+  }
 
   function daysLeft(expiresAt: string) {
     const diff = new Date(expiresAt).getTime() - Date.now();
@@ -114,13 +179,131 @@ export default function AdminDashboard({ stats, users: initialUsers }: { stats: 
         </div>
       </nav>
 
-      <main className="max-w-6xl mx-auto px-6 py-10 space-y-8">
+      <main className="max-w-6xl mx-auto px-6 py-10 space-y-12">
+        
+        {/* Fleet Section */}
+        <section className="space-y-6">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-xl font-bold mb-1">Node Fleet</h1>
+                    <p className="text-white/30 text-sm">Global distributed network servers.</p>
+                </div>
+                <Button 
+                    onClick={() => setShowAddNode(!showAddNode)}
+                    className="bg-white/10 hover:bg-white/20 text-white border border-white/10"
+                >
+                    <Plus className="w-4 h-4 mr-2" /> Add Server
+                </Button>
+            </div>
+
+            {showAddNode && (
+                <Card className="bg-zinc-900 border-white/10 p-6">
+                    {installCommand ? (
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-bold text-emerald-400">Node Created!</h3>
+                            <p className="text-sm text-white/60">SSH into your new VPS as root and run this exact command. It will automatically download, install, and configure everything.</p>
+                            <div className="bg-black p-4 rounded-lg border border-white/10 font-mono text-xs text-white/80 overflow-x-auto">
+                                {installCommand}
+                            </div>
+                            <Button onClick={() => { setShowAddNode(false); setInstallCommand(""); setNewNodeName(""); setNewNodeIp(""); }} variant="outline" className="w-full border-white/10 text-white/70">Done</Button>
+                        </div>
+                    ) : (
+                        <form onSubmit={handleAddNode} className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-xs text-white/60 uppercase tracking-wider">Node Name</label>
+                                    <input 
+                                        type="text" 
+                                        required
+                                        placeholder="e.g. Singapore - Premium" 
+                                        className="w-full bg-black border border-white/10 rounded-md px-3 py-2 text-sm text-white"
+                                        value={newNodeName}
+                                        onChange={e => setNewNodeName(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs text-white/60 uppercase tracking-wider">Public IPv4</label>
+                                    <input 
+                                        type="text" 
+                                        required
+                                        placeholder="140.245.x.x" 
+                                        className="w-full bg-black border border-white/10 rounded-md px-3 py-2 text-sm text-white"
+                                        value={newNodeIp}
+                                        onChange={e => setNewNodeIp(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                            <Button type="submit" className="w-full bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/20">Generate Installation Script</Button>
+                        </form>
+                    )}
+                </Card>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {nodes.map(node => {
+                    const isOnline = (Math.floor(Date.now() / 1000) - node.lastHeartbeat) < 120;
+                    return (
+                        <Card key={node.id} className={`bg-zinc-900 border-white/10 ${node.status === 'disabled' ? 'opacity-50' : ''}`}>
+                            <CardHeader className="pb-2 flex flex-row items-start justify-between">
+                                <div>
+                                    <CardTitle className="text-base font-bold flex items-center gap-2">
+                                        <Server className="w-4 h-4 text-white/60" /> {node.name}
+                                    </CardTitle>
+                                    <p className="text-xs text-white/40 mt-1 font-mono">{node.ip}</p>
+                                </div>
+                                <div className="flex gap-2">
+                                    {isOnline && node.status === 'active' ? (
+                                        <span className="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Online
+                                        </span>
+                                    ) : (
+                                        <span className="flex items-center gap-1.5 text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded border border-red-500/20">
+                                            Offline
+                                        </span>
+                                    )}
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div>
+                                    <div className="flex justify-between text-xs text-white/40 mb-1">
+                                        <span>Active Load</span>
+                                        <span>{node.currentLoad} / {node.maxCapacity}</span>
+                                    </div>
+                                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                        <div 
+                                            className={`h-full rounded-full ${node.currentLoad >= node.maxCapacity ? 'bg-red-400' : 'bg-blue-400'}`} 
+                                            style={{ width: `${Math.min(100, (node.currentLoad / node.maxCapacity) * 100)}%` }} 
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-between border-t border-white/5 pt-4">
+                                    <div className="flex items-center gap-2" title="API Key">
+                                        <Key className="w-3 h-3 text-white/20" />
+                                        <code className="text-[10px] text-white/30 truncate max-w-[100px]">{node.apiKey.substring(0,8)}...</code>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <button onClick={() => toggleNodeStatus(node.id, node.status)} className="text-xs text-white/40 hover:text-white transition-colors flex items-center gap-1">
+                                            <Power className="w-3 h-3" /> {node.status === 'active' ? 'Disable' : 'Enable'}
+                                        </button>
+                                        <button onClick={() => deleteNode(node.id)} className="text-xs text-red-400/50 hover:text-red-400 transition-colors">
+                                            <Trash2 className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    );
+                })}
+            </div>
+        </section>
+
+        {/* Overview Stats */}
+        <section className="space-y-6">
         <div>
-          <h1 className="text-xl font-bold mb-1">Overview</h1>
-          <p className="text-white/30 text-sm">Real-time snapshot of all users and configs.</p>
+          <h2 className="text-xl font-bold mb-1">Network Overview</h2>
+          <p className="text-white/30 text-sm">Combined stats across all nodes.</p>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="bg-zinc-900 border-white/10">
             <CardHeader className="pb-2">
@@ -149,7 +332,7 @@ export default function AdminDashboard({ stats, users: initialUsers }: { stats: 
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-black text-emerald-400">{stats.activeConfigs}</p>
-              <p className="text-xs text-white/30 mt-1">currently connected</p>
+              <p className="text-xs text-white/30 mt-1">total generated</p>
             </CardContent>
           </Card>
 
@@ -177,116 +360,10 @@ export default function AdminDashboard({ stats, users: initialUsers }: { stats: 
             </CardContent>
           </Card>
         </div>
-
-        {/* VPS Stats */}
-        <div>
-          <h2 className="text-sm font-medium text-white/40 mb-3 uppercase tracking-widest">Server</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-
-            <Card className="bg-zinc-900 border-white/10">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xs text-white/40 font-normal flex items-center gap-1.5">
-                  <Cpu className="w-3.5 h-3.5" /> CPU
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-black">{vps ? `${vps.cpu.pct}%` : "—"}</p>
-                <p className="text-xs text-white/30 mt-1">{vps ? `Load ${vps.cpu.load1} · ${vps.cpu.cores} cores` : "loading..."}</p>
-                {vps && <StatBar pct={vps.cpu.pct} color={vps.cpu.pct > 80 ? "bg-red-400" : "bg-white"} />}
-              </CardContent>
-            </Card>
-
-            <Card className="bg-zinc-900 border-white/10">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xs text-white/40 font-normal flex items-center gap-1.5">
-                  <Activity className="w-3.5 h-3.5" /> RAM
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-black">{vps ? `${vps.ram.pct}%` : "—"}</p>
-                <p className="text-xs text-white/30 mt-1">{vps ? `${fmt(vps.ram.used)} / ${fmt(vps.ram.total)}` : "loading..."}</p>
-                {vps && <StatBar pct={vps.ram.pct} color={vps.ram.pct > 80 ? "bg-amber-400" : "bg-white"} />}
-              </CardContent>
-            </Card>
-
-            <Card className="bg-zinc-900 border-white/10">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xs text-white/40 font-normal flex items-center gap-1.5">
-                  <HardDrive className="w-3.5 h-3.5" /> Disk
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-black">{vps ? `${vps.disk.pct}%` : "—"}</p>
-                <p className="text-xs text-white/30 mt-1">{vps ? `${fmt(vps.disk.used)} / ${fmt(vps.disk.total)}` : "loading..."}</p>
-                {vps && <StatBar pct={vps.disk.pct} />}
-              </CardContent>
-            </Card>
-
-            <Card className="bg-zinc-900 border-white/10">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xs text-white/40 font-normal flex items-center gap-1.5">
-                  <Wifi className="w-3.5 h-3.5" /> Live connections
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-black">{vps ? vps.connections : "—"}</p>
-                <p className="text-xs text-white/30 mt-1">
-                  {vps?.liveUsers?.length
-                    ? `${vps.liveUsers.length} active user${vps.liveUsers.length > 1 ? 's' : ''}`
-                    : "no active users"}
-                </p>
-              </CardContent>
-            </Card>
-
-          </div>
-
-          {/* Network + uptime row */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-            <Card className="bg-zinc-900 border-white/10">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xs text-white/40 font-normal flex items-center gap-1.5">
-                  <ArrowDown className="w-3.5 h-3.5 text-emerald-400" /> Total received
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-black">{vps ? fmt(vps.network.rx) : "—"}</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-zinc-900 border-white/10">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xs text-white/40 font-normal flex items-center gap-1.5">
-                  <ArrowUp className="w-3.5 h-3.5 text-blue-400" /> Total sent
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-black">{vps ? fmt(vps.network.tx) : "—"}</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-zinc-900 border-white/10">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xs text-white/40 font-normal flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5" /> Uptime · Hysteria 2
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-black">{vps ? vps.uptime : "—"}</p>
-                <div className="mt-1 flex flex-wrap gap-2">
-                  {vps && (
-                    <Badge className={vps.hysteriaStatus === "active"
-                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-xs"
-                      : "bg-red-500/10 text-red-400 border-red-500/20 text-xs"}>
-                      hysteria {vps.hysteriaStatus}
-                    </Badge>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+        </section>
 
         {/* User table */}
+        <section className="space-y-6">
         <Card className="bg-zinc-900 border-white/10">
           <CardHeader className="pb-4 flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-medium">All Users ({users.length})</CardTitle>
@@ -400,6 +477,7 @@ export default function AdminDashboard({ stats, users: initialUsers }: { stats: 
             </div>
           </CardContent>
         </Card>
+        </section>
       </main>
       <Footer />
     </div>

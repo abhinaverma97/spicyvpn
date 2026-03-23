@@ -74,6 +74,18 @@ function initSchema(db: Database.Database) {
       lastSeen INTEGER DEFAULT (unixepoch()),
       UNIQUE(token, ip)
     );
+
+    CREATE TABLE IF NOT EXISTS nodes (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      ip TEXT UNIQUE NOT NULL,
+      apiKey TEXT UNIQUE NOT NULL,
+      maxCapacity INTEGER DEFAULT 100,
+      currentLoad INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'active',
+      lastHeartbeat INTEGER DEFAULT 0,
+      createdAt INTEGER DEFAULT (unixepoch())
+    );
   `);
 
   // Simple migrations for existing tables
@@ -89,6 +101,15 @@ function initSchema(db: Database.Database) {
     }
     if (!columns.includes("lastActive")) {
       db.exec("ALTER TABLE vpn_configs ADD COLUMN lastActive INTEGER DEFAULT 0;");
+    }
+
+    // Insert default node if nodes table is empty
+    const nodeCount = db.prepare("SELECT COUNT(*) as count FROM nodes").get() as { count: number };
+    if (nodeCount.count === 0) {
+      db.prepare(`
+        INSERT INTO nodes (id, name, ip, apiKey, maxCapacity, status, lastHeartbeat)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run("node-1", "Frankfurt-1 (Master)", "140.245.13.64", "master-default-key-replace-me", 100, "active", Math.floor(Date.now() / 1000));
     }
   } catch (error) {
     console.error("Migration error:", error);

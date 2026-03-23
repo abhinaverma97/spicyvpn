@@ -41,7 +41,34 @@ export async function GET(req: NextRequest) {
     console.error("Device tracking failed:", e);
   }
 
-  const payload = generateHysteriaLink(config.uuid);
+  // Node Load Balancing
+  let selectedIp = undefined;
+  try {
+    // Get all active nodes that sent a heartbeat in the last 2 minutes (120s)
+    // or are recently created and haven't sent one yet.
+    const activeNodes = db.prepare(`
+      SELECT ip, currentLoad 
+      FROM nodes 
+      WHERE status = 'active' 
+      AND ((? - lastHeartbeat) < 120 OR lastHeartbeat = 0)
+    `).all(now) as { ip: string, currentLoad: number }[];
+
+    if (activeNodes && activeNodes.length > 0) {
+      // Find node with the absolute lowest number of concurrent users
+      let bestNode = activeNodes[0];
+
+      for (let i = 1; i < activeNodes.length; i++) {
+        if (activeNodes[i].currentLoad < bestNode.currentLoad) {
+          bestNode = activeNodes[i];
+        }
+      }
+      selectedIp = bestNode.ip;
+    }
+  } catch (e) {
+    console.error("Node load balancing failed:", e);
+  }
+
+  const payload = generateHysteriaLink(config.uuid, selectedIp);
   const finalBody = Buffer.from(payload).toString("base64");
 
   const up = config.totalUp || 0;

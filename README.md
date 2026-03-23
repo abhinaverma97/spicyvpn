@@ -59,34 +59,55 @@ SpicyVPN is not a monolithic application. It is a highly decoupled trinity of se
 - **The Auth Hook (`POST /api/h2/auth`)**:
   - Hysteria 2 acts as a "dumb" router. It holds no user data.
   - When a user connects, Hysteria pauses the handshake and fires an HTTP POST to `localhost:3000/api/h2/auth` with a JSON payload: `{"auth": "uuid-1234..."}`.
-  - Next.js executes a SQL query to verify the UUID exists, `active = 1`, `expiresAt > (unixepoch())`, and `totalUp + totalDown < 30GB`.
+  - Next.js executes a SQL query to verify the UUID exists, `active = 1`, `expiresAt > (unixepoch())`, and `totalUp + totalDown < 35GB`.
   - Next.js returns `{"ok": true, "id": "uuid-1234..."}`. Hysteria uses this `id` to tag all subsequent packets in its RAM.
-- **The Subscription Pipeline (`GET /api/sub?token=...`)**:
-  - Validates the user's public token.
-  - Base64 encodes the Hysteria config: `hysteria2://uuid@ip:8443?insecure=1&sni=spicypepper.app#SpicyVPN`.
-  - Injects `Subscription-Userinfo: upload=X; download=Y; total=Z` headers to natively sync data caps with the client's UI.
+  - **The Subscription Pipeline (`GET /api/sub?token=...`)**:
+    - Validates the user's public token.
+    - Base64 encodes the Hysteria config: `hysteria2://uuid@ip:8443?insecure=1&sni=spicypepper.app#SpicyVPN`.
+    - Injects `Subscription-Userinfo: upload=X; download=Y; total=Z` headers to natively sync data caps with the client's UI.
 
-### II. The VPN Router (`hysteria-server.service`)
-- **Role**: The data plane. A compiled Golang binary running natively on the host Linux kernel.
-- **Network Stack**: Listens on `UDP 8443` for the encrypted QUIC tunnels.
-- **Internal REST API**: Binds exclusively to `127.0.0.1:8080`.
-  - `GET /traffic`: Returns a map of all connected IDs and their exact `tx` (transmit) and `rx` (receive) byte counts since the server started.
-  - `POST /kick`: Accepts a JSON array of IDs `["uuid-1234"]` to instantly sever live QUIC connections.
+  ### II. The VPN Router (`hysteria-server.service`)
+  - **Role**: The data plane. A compiled Golang binary running natively on the host Linux kernel.
+  - **Network Stack**: Listens on `UDP 8443` for the encrypted QUIC tunnels.
+  - **Internal REST API**: Binds exclusively to `127.0.0.1:8080`.
+    - `GET /traffic`: Returns a map of all connected IDs and their exact `tx` (transmit) and `rx` (receive) byte counts since the server started.
+    - `POST /kick`: Accepts a JSON array of IDs `["uuid-1234"]` to instantly sever live QUIC connections.
 
-### III. The Enforcer (`stealthvpn-agent.service` / Node.js)
-- **Role**: The asynchronous reconciliation loop.
-- **Execution Loop**: Every 30,000 milliseconds (30 seconds):
-  1. Executes HTTP GET to Hysteria's `localhost:8080/traffic`.
-  2. Compares the new payload array against an in-memory cached copy of the previous payload.
-  3. Calculates the exact `tx` and `rx` delta for every active UUID.
-  4. Commits an `UPDATE vpn_configs SET totalUp = totalUp + rx, totalDown = totalDown + tx, lastActive = (unixepoch())` to SQLite.
-  5. Executes a `SELECT` to verify the user hasn't breached the 30GB limit or their timestamp limit.
-  6. If breached, it immediately executes an HTTP POST to Hysteria's `/kick` API. The user is disconnected mid-stream and cannot reconnect (blocked by the Auth Hook).
+  ### III. The Enforcer (`stealthvpn-agent.service` / Node.js)
+  - **Role**: The asynchronous reconciliation loop.
+  - **Execution Loop**: Every 30,000 milliseconds (30 seconds):
+    1. Executes HTTP GET to Hysteria's `localhost:8080/traffic`.
+    2. Compares the new payload array against an in-memory cached copy of the previous payload.
+    3. Calculates the exact `tx` and `rx` delta for every active UUID.
+    4. Commits an `UPDATE vpn_configs SET totalUp = totalUp + rx, totalDown = totalDown + tx, lastActive = (unixepoch())` to SQLite.
+    5. Executes a `SELECT` to verify the user hasn't breached the 35GB limit or their timestamp limit.
+    6. If breached, it immediately executes an HTTP POST to Hysteria's `/kick` API. The user is disconnected mid-stream and cannot reconnect (blocked by the Auth Hook).
 
----
+  ---
 
-## 4. Data Layer: SQLite, WAL, and Schema Mechanics
+  ## 4. Multi-Platform Client Ecosystem
 
+  SpicyVPN provides a unified experience across desktop and mobile, ensuring high-speed access regardless of the device.
+
+  ### A. Desktop Client (Windows)
+  - **Tech Stack**: Built with **Tauri v2** (Rust backend) and **React 19** (frontend).
+  - **Core Engine**: Integrates a `sing-box` sidecar to handle the Hysteria 2 connection.
+  - **Features**: 
+    - Custom WebGL Dither background for a premium aesthetic.
+    - Native TUN interface for full-system routing (gaming/UDP support).
+    - Auto-update and local configuration persistence.
+
+  ### B. Android Client
+  - **Tech Stack**: Native **Kotlin** application utilizing **Jetpack Compose**.
+  - **Core Engine**: Based on a customized `SagerNet/sing-box` core via `libbox.aar`.
+  - **Features**:
+    - Supports Android 5.0+ with optimized flavors for Play Store and sideloading.
+    - Advanced features like Per-App Proxy, Shizuku integration, and Xposed self-hooking modules.
+    - Real-time traffic monitoring and profile management.
+
+  ---
+
+  ## 5. Data Layer: SQLite, WAL, and Schema Mechanics
 ### Why SQLite over PostgreSQL?
 For a single-node setup, PostgreSQL introduces unnecessary RAM overhead and network latency. `better-sqlite3` runs directly inside the Node.js process memory space, querying flat files via C++ bindings, resulting in microsecond response times.
 
@@ -130,22 +151,24 @@ The entire stack is bound to `systemd` to ensure 100% uptime, automatic restarts
 
 ---
 
-## 6. The Master/Slave Evolution (Global Edge Networking)
+## 6. The Multi-Node Architecture (Global Edge Networking)
 
-To transition from a single server to a globally distributed VPN network (e.g., nodes in Singapore, Frankfurt, New York, Tokyo), the architecture must shift to a **Master/Slave topology**.
+SpicyVPN operates on a **Master/Slave topology**, allowing infinite horizontal scaling. You can deploy dozens of $5 VPS instances globally, and the central Next.js server will automatically load-balance users across them.
 
 ### The Master Node (The Control Plane)
-- **Location**: Centralized on Vercel or a highly available Hetzner VPS.
-- **Tech**: Next.js, Stripe Billing, and a managed PostgreSQL database.
-- **Role**: Does not handle VPN traffic. It manages users, processes payments, and generates dynamic subscription links targeting different Slave IP addresses.
+- **Role**: The central "brain". It handles Next.js, Auth, Billing, Admin Dashboard, and the SQLite Master Database.
+- **The Load Balancer (`/api/sub`)**: When a user connects to the app, the Master queries the `nodes` table, evaluates the `currentLoad` (absolute number of concurrent users) across all online nodes, and dynamically injects the IP of the **least loaded** node into the generated `hysteria2://` link. 
+- **The Sync APIs**:
+  - `POST /api/node/auth`: Remote Slaves hit this to ask the Master if a UUID is valid and within their 35GB quota.
+  - `POST /api/node/sync`: Remote Slaves hit this every 30 seconds to report data usage and server health. The Master replies with a `kick_users` array for any UUID that exceeded its quota during that 30-second window.
 
 ### The Slave Nodes (The Data Plane)
-- **Location**: Dozens of $5 Hetzner/BuyVM VPS instances scattered globally.
-- **Tech**: Only runs the compiled Hysteria 2 binary and the lightweight `traffic-agent.js`. No local database.
-- **The Cross-Internet Handshake**:
-  1. **Remote Authentication**: When a user connects to the Singapore Slave, the Slave executes an HTTP POST to `https://spicypepper.app/api/node-auth`. The Master verifies the PostgreSQL database and responds `true` or `false`.
-  2. **Remote Telemetry**: The Slave's Traffic Agent gathers the 30-second `tx`/`rx` byte arrays. Instead of writing to SQLite, it executes an authenticated HTTP POST containing the payload to `https://spicypepper.app/api/node-sync`.
-  3. **Remote Execution**: The Master ingests the traffic, updates PostgreSQL, checks for quota breaches, and responds to the Slave's POST with an array: `{"kick_users": ["uuid-x", "uuid-y"]}`. The Slave instantly terminates those sessions locally.
+- **Role**: Lightweight servers running only Hysteria 2 and a Node.js `slave-agent.js`. No local database.
+- **Automated Deployment**: The Admin Panel features an "Add Server" button. It generates a secure API Key and a 1-line bash command:
+  ```bash
+  sudo bash -c "curl -sSL https://spicypepper.app/setup-node.sh | bash -s -- 'https://spicypepper.app' 'API_KEY'"
+  ```
+  Pasting this into a fresh Ubuntu VPS will instantly apply deep kernel tuning, set up port hopping, install Hysteria 2, configure the Brutal pacing limits, and start the sync agent. Within 60 seconds, the new node will appear as "Online" in the Master Admin Dashboard and begin accepting load-balanced connections.
 
 ---
 
@@ -178,6 +201,12 @@ Here is the precise, live, and verified snapshot of every configuration actively
 ### 🐧 1. Linux OS & Kernel Layer (`sysctl`)
 *   **Congestion Control:** `net.ipv4.tcp_congestion_control = bbr`
     *   *(BBR is enabled at the OS layer, but the VPN core utilizes Brutal for precise bandwidth pacing.)*
+*   **Queue Discipline:** `net.core.default_qdisc = fq_codel`
+    *   *(Fair Queuing with Controlled Delay optimizes flow management and reduces bufferbloat for mixed UDP/TCP traffic.)*
+*   **IP Forwarding:** `net.ipv4.ip_forward = 1`
+    *   *(Enabled to support advanced TUN/TAP routing and system-wide proxy modes.)*
+*   **File Descriptor Limit:** `ulimit -n 1048576`
+    *   *(Massively increased to 1,048,576 to handle thousands of concurrent QUIC sessions and database connections.)*
 *   **Maximum Memory Buffers:**
     *   `net.core.rmem_max = 33554432` (32 MB)
     *   `net.core.wmem_max = 33554432` (32 MB)
@@ -196,19 +225,26 @@ Here is the precise, live, and verified snapshot of every configuration actively
     *   *(The kernel is actively intercepting any UDP packet arriving on ports 20,000 through 50,000 and silently forwarding it to Hysteria on port 8443.)*
 
 ### ⚙️ 3. Hysteria 2 Core Config (`/etc/hysteria/config.yaml`)
-*   **Forced Server BBR:** `ignoreClientBandwidth: true`
-    *   *(The server is ignoring user bandwidth inputs and using its own BBR logic.)*
+*   **Brutal Congestion Control Activation:** `ignoreClientBandwidth: false`
+    *   *(The server honors the client's speed requests, which is required to activate Brutal's active pacing mechanism.)*
+*   **Server Bandwidth Limits:**
+    *   `up: 8 mbps` *(Server's max send = Client's max download).*
+    *   `down: 5 mbps` *(Server's max receive = Client's max upload).*
+    *   *(Enforces a hard ceiling. Even if a user attempts to request 1Gbps, the server will force them down to 8/5 Mbps, triggering Brutal to pace at exactly these speeds.)*
 *   **Listening Port & Camouflage:**
     *   `listen: :8443`
     *   `alpn: [h3]` *(Posing as HTTP/3 web traffic.)*
-*   **Elastic QUIC Windows (Anti-Bufferbloat Tuning):**
-    *   `initStreamReceiveWindow: 262144` (256 KB)
-    *   `maxStreamReceiveWindow: 524288` (512 KB)
-    *   `initConnReceiveWindow: 262144` (256 KB)
-    *   `maxConnReceiveWindow: 1048576` (1 MB)
-    *   *(Connections start small (256KB) to protect slow networks from bufferbloat, and BBR is capped to 1MB ceiling to ensure it cannot cause bufferbloat.)*
-*   **MTU:** `mtu: 1350`
+*   **Massive QUIC Buffers (BDP Tuned):**
+    *   `initStreamReceiveWindow: 8388608` (8 MB)
+    *   `maxStreamReceiveWindow: 8388608` (8 MB)
+    *   `initConnReceiveWindow: 20971520` (20 MB)
+    *   `maxConnReceiveWindow: 20971520` (20 MB)
+    *   *(Massively expanded buffers designed to absorb network jitter and allow Brutal to constantly saturate the 8/5 Mbps connection without stalling, even on high-latency international links.)*
+*   **Fixed MTU:** `mtu: 1350`
     *   *(Forced at 1350 to prevent packet fragmentation, specifically optimizing UDP traffic for low-latency gaming.)*
+*   **QUIC-in-QUIC Blocking (HTTP/3 Fallback):**
+    *   `acl: inline: [ - reject(all, udp/443) ]`
+    *   *(Actively blocks UDP 443 inside the tunnel. This forces client browsers to fall back to HTTP/2 over TCP. Hysteria can optimize TCP traffic via Brutal/BBR, but cannot optimize raw UDP. This eliminates UDP bufferbloat and reserves the UDP lane exclusively for games and voice calls.)*
 *   **IPv6 Blackhole Remediation (Forced IPv4):**
     *   `outbounds: [ {name: ipv4_only, type: direct, direct: {mode: "4"}} ]`
     *   `acl: inline: [ - ipv4_only(all) ]`
@@ -222,4 +258,5 @@ Here is the precise, live, and verified snapshot of every configuration actively
 All three pillars of your stack are confirmed to be **ACTIVE** and running:
 *   **`stealthvpn`**: The Next.js web application.
 *   **`hysteria-server`**: The VPN core.
+    *   **Real-Time Priority:** Runs with `CPUSchedulingPolicy=rr` and `CPUSchedulingPriority=99` via a drop-in override. This guarantees the CPU prioritizes VPN packet encryption/decryption, drastically reducing latency jitter under heavy system load.
 *   **`stealthvpn-agent`**: The Node.js traffic monitor and active enforcer.

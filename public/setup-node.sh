@@ -23,6 +23,18 @@ fi
 
 echo "Using Master URL: $MASTER_URL"
 
+# Function to wait for apt lock
+wait_for_apt() {
+  echo "⏳ Waiting for background package updates to finish..."
+  while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 ; do
+    sleep 2
+  done
+  while fuser /var/lib/apt/lists/lock >/dev/null 2>&1 ; do
+    sleep 2
+  done
+  echo "✅ Package manager is ready."
+}
+
 echo "1. Applying Deep Kernel Tuning..."
 cat << 'EOF' > /etc/sysctl.d/99-spicyvpn.conf
 net.ipv4.tcp_congestion_control = bbr
@@ -44,6 +56,7 @@ echo "fs.file-max = 1048576" >> /etc/sysctl.conf
 sysctl -p
 
 echo "3. Configuring iptables Port Hopping and Firewall..."
+wait_for_apt
 apt-get update && apt-get install -y iptables-persistent
 
 # Allow incoming traffic on the primary port
@@ -115,7 +128,9 @@ systemctl enable hysteria-server
 systemctl restart hysteria-server
 
 echo "5. Installing Node.js and Slave Agent..."
+wait_for_apt
 curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+wait_for_apt
 apt-get install -y nodejs
 npm install -g pm2
 

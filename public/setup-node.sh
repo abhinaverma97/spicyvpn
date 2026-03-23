@@ -157,5 +157,31 @@ pm2 save
 pm2 startup
 
 echo "====================================="
+echo " 6. Running Final System Diagnostics"
+echo "====================================="
+
+sleep 5 # Wait for services to fully initialize
+
+# Check Hysteria
+if systemctl is-active --quiet hysteria-server; then
+    echo "✅ [SUCCESS] Hysteria 2 Core is RUNNING."
+else
+    echo "❌ [ERROR] Hysteria 2 failed to start. Run: sudo journalctl -u hysteria-server -n 20"
+fi
+
+# Check PM2 Agent
+if pm2 pid slave-agent > /dev/null; then
+    echo "✅ [SUCCESS] Node.js Slave Agent is RUNNING and syncing."
+else
+    echo "❌ [ERROR] Slave Agent failed to start. Run: pm2 logs slave-agent"
+fi
+
+# Fetch Public IP
+DETECTED_IP=$(curl -s ifconfig.me || echo "UNKNOWN")
+echo "🌐 Detected Public IP: $DETECTED_IP"
+echo "⚠️ IMPORTANT: Ensure you entered EXACTLY '$DETECTED_IP' when adding this node to the Admin Panel!"
+echo "⚠️ IMPORTANT: Ensure your Cloud Provider Firewall allows UDP 8443 and UDP 20000-50000 Ingress."
+
+echo "====================================="
 echo " Node setup complete! It is now syncing with the Master."
 echo "====================================="

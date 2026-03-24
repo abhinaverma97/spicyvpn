@@ -177,7 +177,7 @@ export default function Dashboard({ user }: { user: User }) {
             </div>
             <div className="flex-1">
               <p className="text-sm font-bold text-blue-400">Hiddify for Desktop Available</p>
-              <p className="text-xs text-white/50 leading-relaxed">Experience a smoother, faster, and more stable connection with our recommended desktop application.</p>
+              <p className="text-xs text-white/50 leading-relaxed">Switch to hiddify on desktop</p>
             </div>
             <a
               href="https://github.com/hiddify/hiddify-app/releases/download/v4.1.1/Hiddify-Windows-Setup-x64.exe"

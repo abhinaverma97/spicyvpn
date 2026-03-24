@@ -176,7 +176,7 @@ export default function Dashboard({ user }: { user: User }) {
               <Monitor className="w-5 h-5 text-blue-400" />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-bold text-blue-400">Hiddify for Desktop Available</p>
+              <p className="text-sm font-bold text-blue-400">Hiddify for Desktop</p>
               <p className="text-xs text-white/50 leading-relaxed">Switch to hiddify on desktop</p>
             </div>
             <a

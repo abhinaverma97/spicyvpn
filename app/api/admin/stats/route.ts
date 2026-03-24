@@ -47,32 +47,48 @@ export async function GET() {
 
   // 2. Fetch User Stats and Live Connections from DB
   const now = Math.floor(Date.now() / 1000);
-  // Consider users active if they transferred data in the last 60 seconds
-  const ACTIVE_THRESHOLD = now - 60; 
+  // Increase threshold to 90s to account for potential node-hub latency
+  const ACTIVE_THRESHOLD = now - 90; 
 
-  const configs = db.prepare("SELECT uuid, totalUp, totalDown, lastActive FROM vpn_configs").all() as any[];
+  // Efficiently get sums and active counts via SQL instead of looping in memory
+  const globalTraffic = db.prepare(`
+    SELECT 
+      SUM(totalUp) as up, 
+      SUM(totalDown) as down,
+      (SELECT COUNT(*) FROM vpn_configs 
+       WHERE lastActive >= ? 
+       AND (nodeId IS NOT NULL)) as live_count
+    FROM vpn_configs
+  `).get(ACTIVE_THRESHOLD) as { up: number, down: number, live_count: number };
 
-  let totalTraffic = 0;
-  let totalUp = 0;
-  let totalDown = 0;
-  let liveConnections = 0;
+  const totalUp = globalTraffic.up || 0;
+  const totalDown = globalTraffic.down || 0;
+  const totalTraffic = totalUp + totalDown;
+  const liveConnections = globalTraffic.live_count;
+
+  // We still need the userTraffic map for the user table in the dashboard
+  const userTrafficRecords = db.prepare("SELECT uuid, totalUp, totalDown, lastActive FROM vpn_configs").all() as any[];
   const userTraffic: Record<string, { up: number; down: number; lastActive: number }> = {};
   const liveUsers: string[] = [];
 
-  for (const config of configs) {
-    const up = config.totalUp || 0;
-    const down = config.totalDown || 0;
-    totalTraffic += (up + down);
-    totalUp += up;
-    totalDown += down;
-    
-    userTraffic[config.uuid] = { up, down, lastActive: config.lastActive };
-    
-    if (config.lastActive >= ACTIVE_THRESHOLD) {
-      liveConnections++;
-      liveUsers.push(config.uuid);
+  for (const record of userTrafficRecords) {
+    userTraffic[record.uuid] = { 
+      up: record.totalUp || 0, 
+      down: record.totalDown || 0, 
+      lastActive: record.lastActive 
+    };
+    if (record.lastActive >= ACTIVE_THRESHOLD) {
+      liveUsers.push(record.uuid);
     }
   }
+
+  // 3. Node-specific load stats
+  const nodeStats = db.prepare(`
+    SELECT SUM(currentLoad) as total_node_load FROM nodes WHERE status = 'active'
+  `).get() as { total_node_load: number };
+  
+  // Use node-reported load as the primary metric if available
+  const reportConnections = Math.max(liveConnections, nodeStats.total_node_load || 0);
 
   // 3. System Stats
   const cpus = os.cpus();
@@ -96,7 +112,7 @@ export async function GET() {
     disk: diskStats,
     uptime: getUptime(),
     network: { rx: totalDown, tx: totalUp }, 
-    connections: liveConnections,
+    connections: reportConnections,
     liveUsers: liveUsers, 
     hysteriaStatus: "active",
     userTraffic,

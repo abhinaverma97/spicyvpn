@@ -26,6 +26,7 @@ type User = {
   expiresAt: string | null;
   active: boolean;
   deviceCount: number;
+  lastActive: number | null;
 };
 
 type Node = {
@@ -66,9 +67,11 @@ function StatBar({ pct, color = "bg-white" }: { pct: number; color?: string }) {
   );
 }
 
-export default function AdminDashboard({ stats, users: initialUsers }: { stats: Stats; users: User[] }) {
+export default function AdminDashboard({ stats, users: initialUsers, nodes: initialNodes = [] }: { stats: Stats; users: User[]; nodes?: Node[] }) {
+  console.log("[AdminDashboard] Rendering component...");
+  const [mounted, setMounted] = useState(false);
   const [users, setUsers] = useState<User[]>(initialUsers);
-  const [nodes, setNodes] = useState<Node[]>([]);
+  const [nodes, setNodes] = useState<Node[]>(initialNodes);
   const [vps, setVps] = useState<VpsStats | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -89,20 +92,87 @@ export default function AdminDashboard({ stats, users: initialUsers }: { stats: 
   }
 
   async function fetchNodes() {
-    const res = await fetch("/api/admin/nodes");
-    if (res.ok) setNodes(await res.json());
+    try {
+      const res = await fetch("/api/admin/nodes");
+      if (res.ok) {
+        setNodes(await res.json());
+      } else {
+        console.error(`Failed to fetch nodes: ${res.status} ${res.statusText}`);
+      }
+    } catch (err) {
+      console.error("Error fetching nodes:", err);
+    }
   }
 
   useEffect(() => {
+    setMounted(true);
+    console.log("[AdminDashboard] Initialized with users:", initialUsers?.length, "nodes:", initialNodes?.length);
+    
     async function fetchVps() {
-      const res = await fetch("/api/admin/stats");
-      if (res.ok) setVps(await res.json());
+      try {
+        console.log("[AdminDashboard] Fetching VPS stats...");
+        const res = await fetch("/api/admin/stats");
+        if (res.ok) {
+          const data = await res.json();
+          console.log("[AdminDashboard] VPS stats received:", data);
+          setVps(data);
+        } else {
+          console.error(`[AdminDashboard] Failed to fetch VPS stats: ${res.status} ${res.statusText}`);
+        }
+      } catch (err) {
+        console.error("[AdminDashboard] Error fetching VPS stats:", err);
+      }
     }
+
+    async function fetchNodes() {
+      try {
+        console.log("[AdminDashboard] Fetching nodes...");
+        const res = await fetch("/api/admin/nodes");
+        if (res.ok) {
+          const data = await res.json();
+          console.log("[AdminDashboard] Nodes received:", data);
+          setNodes(data);
+        } else {
+          console.error(`[AdminDashboard] Failed to fetch nodes: ${res.status} ${res.statusText}`);
+        }
+      } catch (err) {
+        console.error("[AdminDashboard] Error fetching nodes:", err);
+      }
+    }
+
+    async function fetchUsers() {
+      try {
+        console.log("[AdminDashboard] Fetching users...");
+        const res = await fetch("/api/admin");
+        if (res.ok) {
+          const data = await res.json();
+          console.log("[AdminDashboard] Users raw data received:", data?.length, "records");
+          const mapped = data.map((u: any) => ({
+            ...u,
+            joinedAt: u.createdAt ? new Date(u.createdAt * 1000).toISOString() : new Date().toISOString(),
+            active: Boolean(u.active),
+            expiresAt: u.expiresAt ? new Date(u.expiresAt * 1000).toISOString() : null,
+            lastActive: Number(u.lastActive || 0),
+          }));
+          console.log("[AdminDashboard] Users mapped. First user lastActive:", mapped[0]?.lastActive);
+          setUsers(mapped);
+        } else {
+          console.error(`[AdminDashboard] Failed to fetch users: ${res.status} ${res.statusText}`);
+        }
+      } catch (err) {
+        console.error("[AdminDashboard] Error fetching users:", err);
+      }
+    }
+    
     fetchVps();
     fetchNodes();
+    fetchUsers();
+    
     const interval = setInterval(() => {
+        console.log("[AdminDashboard] Polling for updates...");
         fetchVps();
         fetchNodes();
+        fetchUsers();
     }, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -144,18 +214,33 @@ export default function AdminDashboard({ stats, users: initialUsers }: { stats: 
     fetchNodes();
   }
 
-  function daysLeft(expiresAt: string) {
-    const diff = new Date(expiresAt).getTime() - Date.now();
+  function daysLeft(expiresAt: any) {
+    if (!expiresAt) return 0;
+    const expiry = typeof expiresAt === 'number' ? expiresAt * 1000 : new Date(expiresAt).getTime();
+    const diff = expiry - Date.now();
     return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
   }
 
   const usedPct = Math.round((stats.totalUsers / stats.capacity) * 100);
 
+  if (!mounted) return null;
+
+  const now = Math.floor(Date.now() / 1000);
+
   const sortedUsers = [...users].sort((a, b) => {
     if (!sortByLive) return 0;
-    const aLive = a.uuid && vps?.liveUsers?.includes(a.uuid) ? 1 : 0;
-    const bLive = b.uuid && vps?.liveUsers?.includes(b.uuid) ? 1 : 0;
-    return bLive - aLive;
+    
+    const aIsLive = a.lastActive && (now - a.lastActive) < 90 ? 1 : 0;
+    const bIsLive = b.lastActive && (now - b.lastActive) < 90 ? 1 : 0;
+    
+    if (aIsLive !== bIsLive) {
+      return bIsLive - aIsLive;
+    }
+    
+    // If both are live or both are not live, sort by more recent activity
+    const aTime = a.lastActive || 0;
+    const bTime = b.lastActive || 0;
+    return bTime - aTime;
   });
 
   return (
@@ -327,6 +412,20 @@ export default function AdminDashboard({ stats, users: initialUsers }: { stats: 
           <Card className="bg-zinc-900 border-white/10">
             <CardHeader className="pb-2">
               <CardTitle className="text-xs text-white/40 font-normal flex items-center gap-1.5">
+                <Activity className="w-3.5 h-3.5 text-emerald-400" /> Live connections
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-black text-white">
+                {(users as any[]).filter(u => u.lastActive && (Math.floor(Date.now() / 1000) - u.lastActive) < 90).length}
+              </p>
+              <p className="text-xs text-white/30 mt-1">active unique users (last 90s)</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-zinc-900 border-white/10">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs text-white/40 font-normal flex items-center gap-1.5">
                 <Wifi className="w-3.5 h-3.5" /> Active configs
               </CardTitle>
             </CardHeader>
@@ -395,8 +494,8 @@ export default function AdminDashboard({ stats, users: initialUsers }: { stats: 
                     <tr key={i} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
                       <td className="px-6 py-3">
                         <div className="flex items-center gap-2">
-                          {u.uuid && vps?.liveUsers?.includes(u.uuid) && (
-                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" title="Connected now" />
+                          {!!((u as any).lastActive && (Math.floor(Date.now() / 1000) - (u as any).lastActive) < 90) && (
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" title="Connected" />
                           )}
                           <p className="font-medium text-white/80">{u.name || "—"}</p>
                         </div>

@@ -41,34 +41,30 @@ export async function GET(req: NextRequest) {
     console.error("Device tracking failed:", e);
   }
 
-  // Node Load Balancing
-  let selectedIp = undefined;
+  // Node Load Balancer Logic
+  let payload = "";
   try {
-    // Get all active nodes that sent a heartbeat in the last 2 minutes (120s)
-    // or are recently created and haven't sent one yet.
-    const activeNodes = db.prepare(`
-      SELECT ip, currentLoad 
+    // Get the node with the lowest currentLoad that is still active
+    const bestNode = db.prepare(`
+      SELECT ip, name 
       FROM nodes 
       WHERE status = 'active' 
-      AND ((? - lastHeartbeat) < 120 OR lastHeartbeat = 0)
-    `).all(now) as { ip: string, currentLoad: number }[];
+      AND ((? - lastHeartbeat) < 300 OR lastHeartbeat = 0)
+      ORDER BY currentLoad ASC
+      LIMIT 1
+    `).get(now) as { ip: string, name: string } | undefined;
 
-    if (activeNodes && activeNodes.length > 0) {
-      // Find node with the absolute lowest number of concurrent users
-      let bestNode = activeNodes[0];
-
-      for (let i = 1; i < activeNodes.length; i++) {
-        if (activeNodes[i].currentLoad < bestNode.currentLoad) {
-          bestNode = activeNodes[i];
-        }
-      }
-      selectedIp = bestNode.ip;
+    if (bestNode) {
+      payload = generateHysteriaLink(config.uuid, bestNode.ip, bestNode.name);
+    } else {
+      // Fallback to Master IP if no nodes are found in DB
+      payload = generateHysteriaLink(config.uuid);
     }
   } catch (e) {
-    console.error("Node load balancing failed:", e);
+    console.error("Load balancer failed:", e);
+    payload = generateHysteriaLink(config.uuid);
   }
 
-  const payload = generateHysteriaLink(config.uuid, selectedIp);
   const finalBody = Buffer.from(payload).toString("base64");
 
   const up = config.totalUp || 0;

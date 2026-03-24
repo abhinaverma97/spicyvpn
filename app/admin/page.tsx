@@ -27,6 +27,7 @@ export default async function AdminPage() {
       v.token,
       v.expiresAt,
       v.active,
+      v.lastActive,
       v.createdAt as configCreatedAt,
       (SELECT COUNT(*) FROM token_devices td WHERE td.token = v.token) as deviceCount
     FROM users u
@@ -34,9 +35,12 @@ export default async function AdminPage() {
     ORDER BY u.createdAt DESC
   `).all() as Record<string, unknown>[];
 
+  const nodes = db.prepare(`SELECT * FROM nodes ORDER BY createdAt ASC`).all();
+
   return (
     <AdminDashboard
       stats={{ totalUsers, activeConfigs, expiredConfigs, totalConfigs, capacity: 500 }}
+      nodes={nodes as any[]}
       users={users.map(u => ({
         id: u.id as string,
         email: u.email as string,
@@ -47,6 +51,7 @@ export default async function AdminPage() {
         expiresAt: u.expiresAt ? new Date((u.expiresAt as number) * 1000).toISOString() : null,
         active: Boolean(u.active),
         deviceCount: 0,
+        lastActive: Number(u.lastActive || 0),
       }))}
 
     />

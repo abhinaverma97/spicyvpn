@@ -14,9 +14,11 @@ export async function GET() {
 
   const db = getDb();
   const users = db.prepare(`
-    SELECT users.*, vpn_configs.uuid, vpn_configs.token, vpn_configs.expiresAt, vpn_configs.active
+    SELECT 
+      users.id, users.name, users.email, users.image, users.createdAt,
+      vpn_configs.uuid, vpn_configs.token, vpn_configs.expiresAt, vpn_configs.active, vpn_configs.lastActive, vpn_configs.lastSyncTime
     FROM users
-    LEFT JOIN vpn_configs ON users.id = vpn_configs.userId
+    LEFT JOIN vpn_configs ON users.id = vpn_configs.userId AND vpn_configs.active = 1
     ORDER BY users.createdAt DESC
     LIMIT 1000
   `).all();

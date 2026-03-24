@@ -151,24 +151,37 @@ The entire stack is bound to `systemd` to ensure 100% uptime, automatic restarts
 
 ---
 
-## 6. The Multi-Node Architecture (Global Edge Networking)
+## 6. The Multi-Node Architecture & Global Scaling (Edge Networking)
 
-SpicyVPN operates on a **Master/Slave topology**, allowing infinite horizontal scaling. You can deploy dozens of $5 VPS instances globally, and the central Next.js server will automatically load-balance users across them.
+SpicyVPN operates on a highly scalable **Master-Worker (Hub-and-Spoke) topology**, allowing infinite horizontal scaling without user data fragmentation.
 
-### The Master Node (The Control Plane)
-- **Role**: The central "brain". It handles Next.js, Auth, Billing, Admin Dashboard, and the SQLite Master Database.
-- **The Load Balancer (`/api/sub`)**: When a user connects to the app, the Master queries the `nodes` table, evaluates the `currentLoad` (absolute number of concurrent users) across all online nodes, and dynamically injects the IP of the **least loaded** node into the generated `hysteria2://` link. 
-- **The Sync APIs**:
-  - `POST /api/node/auth`: Remote Slaves hit this to ask the Master if a UUID is valid and within their 35GB quota.
-  - `POST /api/node/sync`: Remote Slaves hit this every 30 seconds to report data usage and server health. The Master replies with a `kick_users` array for any UUID that exceeded its quota during that 30-second window.
+### The Master Node (The Central Hub)
+- **Role**: The single source of truth. Handles Next.js, Auth, Billing, the Admin Dashboard, and the master SQLite Database (`dev.db`).
+- **Dynamic Load Balancing (`GET /api/sub`)**: When a user fetches their subscription, the Master evaluates the `currentLoad` of all active worker nodes. It dynamically generates a `hysteria2://` URI pointing to the least-loaded node, ensuring traffic is evenly distributed globally.
+- **Real-Time Orchestration APIs**:
+  - `POST /api/h2/auth`: Real-time HTTP Auth Hook. Worker nodes query this endpoint instantly upon connection to validate UUIDs against the 35GB quota and expiration dates.
+  - `POST /api/node/sync`: The data reconciliation endpoint. Remote workers send delta traffic updates here every 30 seconds.
 
-### The Slave Nodes (The Data Plane)
-- **Role**: Lightweight servers running only Hysteria 2 and a Node.js `slave-agent.js`. No local database.
-- **Automated Deployment**: The Admin Panel features an "Add Server" button. It generates a secure API Key and a 1-line bash command:
-  ```bash
-  sudo bash -c "curl -sSL https://spicypepper.app/setup-node.sh | bash -s -- 'https://spicypepper.app' 'API_KEY'"
-  ```
-  Pasting this into a fresh Ubuntu VPS will instantly apply deep kernel tuning, set up port hopping, install Hysteria 2, configure the Brutal pacing limits, and start the sync agent. Within 60 seconds, the new node will appear as "Online" in the Master Admin Dashboard and begin accepting load-balanced connections.
+### The Worker Nodes (The Data Plane)
+- **Role**: Stateless, lightweight edge servers running Hysteria 2 and a Node.js `traffic-agent.js`. They hold zero user data locally.
+- **Automated Deployment**: New nodes are deployed via a 1-line bash script generated from the Admin Panel, which automatically configures the API keys, installs Hysteria 2, and starts the sync agent.
+
+### Data Synchronization & Activity Tracking Mechanics
+Scaling introduces the challenge of tracking active users across multiple stateless servers. SpicyVPN solves this using a precise Delta-Sync model and dual-window activity tracking:
+
+1. **Delta Traffic Calculation**: 
+   - Every 30 seconds, `traffic-agent.js` polls the local Hysteria 2 server.
+   - It calculates the *delta* (increase) in RX/TX bytes since the last poll.
+   - It sends this delta to the Master's `/api/node/sync`. The Master adds this to the user's `totalUp` and `totalDown` in the database.
+   - *Resilience*: If a node restarts and counters reset to 0, the delta logic detects the negative drop and safely resets its baseline without double-counting traffic.
+
+2. **Active Load vs. Live Connections**:
+   - **Active Load (30s Window)**: Represents instantaneous server stress. A user is only counted towards the Active Load if their RX/TX delta was greater than 1KB in the last 30-second sync window. Idle background connections are ignored.
+   - **Live Connections (90s Window)**: Represents the active user base. The dashboard displays a "Green Dot" for any unique user who has transferred data in the last 90 seconds (`lastActive`). 
+   - *The Result*: It is normal and mathematically correct for "Live Connections" to be higher than the sum of the "Active Load." Active Load counts people *currently downloading*, while Live Connections counts people *sitting in an active session*.
+
+3. **Quota Enforcement (The Kick List)**:
+   - During the 30-second sync, if the Master detects a user has crossed the 35GB limit or expired, it returns an array of UUIDs (`kick_users`). The worker node's agent immediately fires an API call to Hysteria to terminate those specific QUIC sessions mid-stream.
 
 ---
 

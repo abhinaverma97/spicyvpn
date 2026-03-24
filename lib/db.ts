@@ -63,6 +63,8 @@ function initSchema(db: Database.Database) {
       totalUp INTEGER DEFAULT 0,
       totalDown INTEGER DEFAULT 0,
       lastActive INTEGER DEFAULT 0,
+      nodeId TEXT DEFAULT NULL,
+      lastSyncTime INTEGER DEFAULT 0,
       FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
     );
 
@@ -84,6 +86,7 @@ function initSchema(db: Database.Database) {
       currentLoad INTEGER DEFAULT 0,
       status TEXT DEFAULT 'active',
       lastHeartbeat INTEGER DEFAULT 0,
+      lastTraffic TEXT DEFAULT '{}',
       createdAt INTEGER DEFAULT (unixepoch())
     );
   `);
@@ -101,6 +104,18 @@ function initSchema(db: Database.Database) {
     }
     if (!columns.includes("lastActive")) {
       db.exec("ALTER TABLE vpn_configs ADD COLUMN lastActive INTEGER DEFAULT 0;");
+    }
+    if (!columns.includes("nodeId")) {
+      db.exec("ALTER TABLE vpn_configs ADD COLUMN nodeId TEXT DEFAULT NULL;");
+    }
+    if (!columns.includes("lastSyncTime")) {
+      db.exec("ALTER TABLE vpn_configs ADD COLUMN lastSyncTime INTEGER DEFAULT 0;");
+    }
+
+    const nodeTableInfo = db.pragma("table_info(nodes)") as any[];
+    const nodeColumns = nodeTableInfo.map(c => c.name);
+    if (!nodeColumns.includes("lastTraffic")) {
+      db.exec("ALTER TABLE nodes ADD COLUMN lastTraffic TEXT DEFAULT '{}';");
     }
 
     // Insert default node if nodes table is empty

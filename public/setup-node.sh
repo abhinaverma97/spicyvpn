@@ -1,41 +1,100 @@
 #!/bin/bash
-# SpicyVPN - Automated Slave Node Provisioning Script
-# Run this script on a fresh Ubuntu VPS to join it to the Master cluster.
+# SpicyVPN - Ultimate Slave Node Provisioning Script v2.3
+# Optimized for Ubuntu 22.04+ (ARM64 & x86_64)
 
 set -e
+export DEBIAN_FRONTEND=noninteractive
 
+# Setup Logging
+LOG_FILE="/var/log/spicy-setup.log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+
+echo "================================================="
+echo " 🌶️  SpicyVPN Slave Node Provisioning v2.3 "
+echo " Started at: $(date)"
+echo "================================================="
+
+# 1. Core Sanity Checks
 if [ "$EUID" -ne 0 ]; then
-  echo "Please run as root (use sudo)"
+  echo "❌ ERROR: Please run as root (use sudo)"
   exit 1
 fi
 
-echo "====================================="
-echo " SpicyVPN Slave Node Setup "
-echo "====================================="
-
-MASTER_URL=$1
+MASTER_URL_INPUT=$1
 API_KEY=$2
 
-if [ -z "$MASTER_URL" ] || [ -z "$API_KEY" ]; then
-    echo "Usage: curl -sSL https://yourdomain.com/setup-node.sh | bash -s -- <MASTER_URL> <API_KEY>"
+if [ -z "$MASTER_URL_INPUT" ] || [ -z "$API_KEY" ]; then
+    echo "Usage: sudo bash setup-node.sh <MASTER_URL> <API_KEY>"
+    echo "Example: sudo bash setup-node.sh https://spicypepper.app YOUR_API_KEY"
     exit 1
 fi
 
-echo "Using Master URL: $MASTER_URL"
+# Normalize Master URL (Remove trailing slash and ensure protocol)
+MASTER_URL=$(echo "$MASTER_URL_INPUT" | sed 's:/*$::')
+if [[ ! "$MASTER_URL" =~ ^https?:// ]]; then
+    MASTER_URL="https://$MASTER_URL"
+fi
 
-# Function to wait for apt lock
+echo "Master URL:  $MASTER_URL"
+echo "Node IP:     $(curl -s --connect-timeout 5 https://ifconfig.me || echo "Unknown")"
+echo "Architecture: $(uname -m)"
+echo "Log File:    $LOG_FILE"
+echo "================================================="
+
+# Trap for cleanup on error
+cleanup() {
+  if [ $? -ne 0 ]; then
+    echo "❌ ERROR: Installation failed. Check $LOG_FILE for details."
+  fi
+}
+trap cleanup EXIT
+
+# Function: Wait for apt lock (Robust)
 wait_for_apt() {
-  echo "⏳ Waiting for background package updates to finish..."
-  while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 ; do
-    sleep 2
+  echo "⏳ Waiting for package manager lock..."
+  local timeout=300
+  local elapsed=0
+  while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || fuser /var/lib/apt/lists/lock >/dev/null 2>&1 ; do 
+    if [ $elapsed -ge $timeout ]; then
+      echo "❌ ERROR: Apt lock timeout after 5 minutes. Please check for hung processes."
+      exit 1
+    fi
+    sleep 5
+    ((elapsed+=5))
   done
-  while fuser /var/lib/apt/lists/lock >/dev/null 2>&1 ; do
-    sleep 2
-  done
-  echo "✅ Package manager is ready."
+  echo "✅ Package manager ready."
 }
 
-echo "1. Applying Deep Kernel Tuning..."
+# 2. Pre-flight: Check Master Reachability
+echo "🔍 Verifying connection to Master..."
+if ! curl -s --head --request GET --connect-timeout 10 "$MASTER_URL" > /dev/null; then
+  echo "❌ ERROR: Cannot reach Master URL: $MASTER_URL"
+  echo "Please check your network and ensure the Master server is online."
+  exit 1
+fi
+echo "✅ Master is reachable."
+
+# 3. System Dependencies
+echo "📦 Installing system dependencies..."
+wait_for_apt
+apt-get update
+apt-get install -y curl openssl iptables-persistent socat jq ca-certificates gnupg net-tools wget
+
+# 4. Node.js Installation (Standardized)
+if ! command -v node &> /dev/null || ! node -v | grep -q "v20"; then
+    echo "🟢 Installing/Updating Node.js (v20)..."
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg --yes
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
+    wait_for_apt
+    apt-get update
+    apt-get install -y nodejs
+else
+    echo "✅ Node.js already installed: $(node -v)"
+fi
+
+# 5. Deep Kernel Tuning
+echo "🚀 Applying kernel optimizations..."
 cat << 'EOF' > /etc/sysctl.d/99-spicyvpn.conf
 net.ipv4.tcp_congestion_control = bbr
 net.core.default_qdisc = fq_codel
@@ -46,31 +105,47 @@ net.core.rmem_default = 131072
 net.core.wmem_default = 131072
 net.ipv4.udp_rmem_min = 16384
 net.ipv4.udp_wmem_min = 16384
+fs.file-max = 1048576
 EOF
-sysctl -p /etc/sysctl.d/99-spicyvpn.conf
+sysctl -p /etc/sysctl.d/99-spicyvpn.conf || true
 
-echo "2. Raising File Descriptor Limits..."
-echo "* soft nofile 1048576" >> /etc/security/limits.conf
-echo "* hard nofile 1048576" >> /etc/security/limits.conf
-echo "fs.file-max = 1048576" >> /etc/sysctl.conf
-sysctl -p
+echo "📂 Increasing file descriptor limits..."
+cat << 'EOF' > /etc/security/limits.d/spicyvpn.conf
+* soft nofile 1048576
+* hard nofile 1048576
+root soft nofile 1048576
+root hard nofile 1048576
+EOF
 
-echo "3. Configuring iptables Port Hopping and Firewall..."
-wait_for_apt
-apt-get update && apt-get install -y iptables-persistent
+# 6. Firewall & Port Hopping (Idempotent)
+echo "🛡️ Configuring firewall rules..."
 
-# Allow incoming traffic on the primary port
-iptables -I INPUT 6 -m state --state NEW -p udp --dport 8443 -j ACCEPT
+# Helper to add iptables rules only if they don't exist
+safe_iptables_input() {
+  iptables -C INPUT "$@" >/dev/null 2>&1 || iptables -I INPUT 1 "$@"
+}
 
-# Allow incoming traffic on the port hopping range
-iptables -I INPUT 6 -m state --state NEW -p udp --dport 20000:50000 -j ACCEPT
+safe_iptables_nat() {
+  iptables -t nat -C PREROUTING "$@" >/dev/null 2>&1 || iptables -t nat -A PREROUTING "$@"
+}
 
-# Set up the NAT redirect for port hopping
-iptables -t nat -A PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports 8443
+safe_iptables_input -p udp --dport 8443 -j ACCEPT
+safe_iptables_input -p udp --dport 20000:50000 -j ACCEPT
+safe_iptables_nat -p udp --dport 20000:50000 -j REDIRECT --to-ports 8443
 
-netfilter-persistent save
+# Disable UFW as it often conflicts with manual iptables
+if command -v ufw &> /dev/null; then
+    ufw disable || true
+fi
 
-echo "4. Installing Hysteria 2..."
+# Save rules
+if command -v netfilter-persistent &> /dev/null; then
+    netfilter-persistent save || true
+fi
+
+# 7. Hysteria 2 Core Installation
+echo "🌐 Installing/Updating Hysteria 2..."
+# Official Hysteria 2 install script handles updates
 bash <(curl -fsSL https://get.hy2.sh/)
 
 mkdir -p /etc/hysteria
@@ -119,24 +194,27 @@ acl:
     - ipv4_only(all)
 EOF
 
-# Note: In production you'd need valid certs. This creates self-signed for testing.
-openssl req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout /etc/hysteria/server.key -out /etc/hysteria/server.crt -subj "/CN=spicypepper.app"
+# Generate Self-Signed Cert if missing
+if [ ! -f /etc/hysteria/server.crt ] || [ ! -f /etc/hysteria/server.key ]; then
+    echo "🔑 Generating self-signed SSL certificates..."
+    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+    -keyout /etc/hysteria/server.key -out /etc/hysteria/server.crt \
+    -subj "/CN=spicy-node"
+fi
 
+# Fix permissions
+id -u hysteria &>/dev/null || useradd -r -s /bin/false hysteria
 chown -R hysteria:hysteria /etc/hysteria
 
+systemctl daemon-reload
 systemctl enable hysteria-server
 systemctl restart hysteria-server
 
-echo "5. Installing Node.js and Slave Agent..."
-wait_for_apt
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-wait_for_apt
-apt-get install -y nodejs
-npm install -g pm2
-
-cat << EOF > /root/slave-agent.js
+# 8. Slave Agent (Systemd Service)
+echo "🤖 Setting up Slave Agent Service..."
+mkdir -p /opt/spicyvpn
+cat << EOF > /opt/spicyvpn/slave-agent.js
 const axios = require('axios');
-
 const MASTER_API_URL = "${MASTER_URL}";
 const API_KEY = "${API_KEY}";
 const HYSTERIA_API_URL = "http://127.0.0.1:8080";
@@ -154,49 +232,81 @@ async function sync() {
 
     const kickUsers = syncRes.data.kick_users;
     if (kickUsers && kickUsers.length > 0) {
-      await axios.post(\`\${HYSTERIA_API_URL}/kick\`, kickUsers);
-      console.log(\`Kicked users: \${kickUsers.join(', ')}\`);
+      try {
+        await axios.post(\`\${HYSTERIA_API_URL}/kick\`, kickUsers);
+        console.log(\`[\${new Date().toISOString()}] Kicked users: \${kickUsers.join(', ')}\`);
+      } catch (kickErr) {
+        console.error(\`[\${new Date().toISOString()}] Kick Error:\`, kickErr.message);
+      }
     }
   } catch (err) {
-    console.error("Sync Error:", err.message);
+    console.error(\`[\${new Date().toISOString()}] Sync Error:\`, err.message);
   }
 }
 
-console.log("Slave Agent Started.");
+console.log("SpicyVPN Slave Agent Started.");
+sync();
 setInterval(sync, INTERVAL_MS);
 EOF
 
-cd /root && npm init -y && npm install axios
-pm2 start /root/slave-agent.js --name slave-agent
-pm2 save
-pm2 startup
+# Install Local Dependencies
+cd /opt/spicyvpn
+if [ ! -f package.json ]; then
+    npm init -y >/dev/null
+fi
+npm install axios --no-audit --no-fund --silent
 
-echo "====================================="
-echo " 6. Running Final System Diagnostics"
-echo "====================================="
+# Create Systemd Service for Agent
+cat << EOF > /etc/systemd/system/spicy-agent.service
+[Unit]
+Description=SpicyVPN Slave Traffic Agent
+After=network.target hysteria-server.service
 
-sleep 5 # Wait for services to fully initialize
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/spicyvpn
+ExecStart=$(which node) /opt/spicyvpn/slave-agent.js
+Restart=always
+RestartSec=10
+LimitNOFILE=1048576
 
-# Check Hysteria
-if systemctl is-active --quiet hysteria-server; then
-    echo "✅ [SUCCESS] Hysteria 2 Core is RUNNING."
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable spicy-agent
+systemctl restart spicy-agent
+
+# 9. Diagnostics & Verification
+echo "================================================="
+echo " 🏁 Final Diagnostics & Verification "
+echo "================================================="
+sleep 5
+
+# Check Services
+if systemctl is-active --quiet hysteria-server; then echo "✅ Hysteria 2 Service: RUNNING"; else echo "❌ Hysteria 2 Service: FAILED"; fi
+if systemctl is-active --quiet spicy-agent; then echo "✅ Slave Agent Service: RUNNING"; else echo "❌ Slave Agent Service: FAILED"; fi
+
+# Check Local Hysteria API
+if curl -s http://127.0.0.1:8080/traffic > /dev/null; then
+  echo "✅ Local Hysteria API: RESPONDING"
 else
-    echo "❌ [ERROR] Hysteria 2 failed to start. Run: sudo journalctl -u hysteria-server -n 20"
+  echo "❌ Local Hysteria API: NOT RESPONDING"
 fi
 
-# Check PM2 Agent
-if pm2 pid slave-agent > /dev/null; then
-    echo "✅ [SUCCESS] Node.js Slave Agent is RUNNING and syncing."
+# Verification: Connect to Master via Sync API
+echo "🔗 Verifying Master Sync Connection..."
+SYNC_CHECK=$(curl -s -X POST -H "Content-Type: application/json" -d "{\"apiKey\": \"$API_KEY\", \"traffic\": {}}" "$MASTER_URL/api/node/sync")
+if echo "$SYNC_CHECK" | grep -q '"ok":true'; then
+  echo "✅ Master Connection: AUTHENTICATED & SYNCED"
 else
-    echo "❌ [ERROR] Slave Agent failed to start. Run: pm2 logs slave-agent"
+  echo "❌ Master Connection: FAILED ($SYNC_CHECK)"
+  echo "Please verify your API Key and Master URL."
 fi
 
-# Fetch Public IP
-DETECTED_IP=$(curl -s ifconfig.me || echo "UNKNOWN")
-echo "🌐 Detected Public IP: $DETECTED_IP"
-echo "⚠️ IMPORTANT: Ensure you entered EXACTLY '$DETECTED_IP' when adding this node to the Admin Panel!"
-echo "⚠️ IMPORTANT: Ensure your Cloud Provider Firewall allows UDP 8443 and UDP 20000-50000 Ingress."
-
-echo "====================================="
-echo " Node setup complete! It is now syncing with the Master."
-echo "====================================="
+echo "================================================="
+echo " 🚀 SETUP COMPLETE! "
+echo " Check $LOG_FILE for full installation logs."
+echo "================================================="

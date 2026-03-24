@@ -10,9 +10,11 @@ function generateApiKey() {
   return crypto.randomBytes(32).toString('hex');
 }
 
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "abhinaverma97@gmail.com";
+
 export async function GET(req: NextRequest) {
   const session = await auth();
-  if (!session || session.user?.email !== process.env.NEXT_PUBLIC_ADMIN_EMAIL) {
+  if (!session || session.user?.email !== ADMIN_EMAIL) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
@@ -28,7 +30,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const session = await auth();
-  if (!session || session.user?.email !== process.env.NEXT_PUBLIC_ADMIN_EMAIL) {
+  if (!session || session.user?.email !== ADMIN_EMAIL) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
@@ -58,7 +60,7 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
     const session = await auth();
-    if (!session || session.user?.email !== process.env.NEXT_PUBLIC_ADMIN_EMAIL) {
+    if (!session || session.user?.email !== ADMIN_EMAIL) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
   
@@ -78,7 +80,7 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   const session = await auth();
-  if (!session || session.user?.email !== process.env.NEXT_PUBLIC_ADMIN_EMAIL) {
+  if (!session || session.user?.email !== ADMIN_EMAIL) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 

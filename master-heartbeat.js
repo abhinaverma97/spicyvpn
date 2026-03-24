@@ -8,8 +8,8 @@ function updateHeartbeat() {
     try {
         const now = Math.floor(Date.now() / 1000);
         
-        // Calculate current load on Master by counting users active in the last 60 seconds
-        const activeUsers = db.prepare(`SELECT COUNT(*) as count FROM vpn_configs WHERE lastActive >= ?`).get(now - 60).count;
+        // Calculate current load on Master by counting users on THIS node active in the last 60 seconds
+        const activeUsers = db.prepare(`SELECT COUNT(*) as count FROM vpn_configs WHERE nodeId = 'node-1' AND lastActive >= ?`).get(now - 60).count;
 
         // Update the Master node's heartbeat and load
         db.prepare(`

@@ -164,32 +164,7 @@ export default function Dashboard({ user }: { user: User }) {
 
       {/* Main */}
       <main className="max-w-5xl mx-auto px-6 py-12">
-        {/* Desktop Client Announcement - Glass Banner */}
-        <div className="mb-8">
-          <GlassCard 
-            intensity={0.05} 
-            blur="12px" 
-            spotlightColor="transparent" 
-            className="p-4 flex items-center gap-4 border-blue-500/10 bg-blue-500/5"
-          >
-            <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0 border border-blue-500/20 shadow-lg backdrop-blur-md">
-              <Monitor className="w-5 h-5 text-blue-400" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-bold text-blue-400">Hiddify for Desktop</p>
-              <p className="text-xs text-white/50 leading-relaxed">Switch to hiddify on desktop</p>
-            </div>
-            <a
-              href="https://github.com/hiddify/hiddify-app/releases/download/v4.1.1/Hiddify-Windows-Setup-x64.exe"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Button variant="ghost" size="sm" className="text-xs font-bold text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                Download
-              </Button>
-            </a>
-          </GlassCard>
-        </div>
+
 
         <div className="mb-10">
           <h1 className="text-3xl font-black mb-2 tracking-tight">Your VPN Access</h1>
@@ -359,18 +334,18 @@ export default function Dashboard({ user }: { user: User }) {
                     </div>
                     <span className="text-lg font-bold text-white/80">Windows</span>
                     <a
-                      href="https://github.com/hiddify/hiddify-app/releases/download/v4.1.1/Hiddify-Windows-Setup-x64.exe"
+                      href="https://github.com/spicyvpn365/spicyvpn/releases/download/win/SpicyVPN_0.1.0_x64-setup.exe"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="ml-auto text-sm font-bold px-4 py-2 rounded-xl border border-white/10 text-white/50 hover:border-white/30 hover:text-white transition-all bg-white/5"
                     >
-                      Download Hiddify
+                      Download App
                     </a>
                   </div>
                   <ol className="space-y-2 text-base text-white/30 ml-4 border-l border-white/5 pl-6">
-                    <li>1. Download and install <span className="text-white/60 font-medium">Hiddify</span> for Windows</li>
+                    <li>1. Download and install <span className="text-white/60 font-medium">Spicyclient</span></li>
                     <li>2. Copy your subscription link</li>
-                    <li>3. Open Hiddify → click <span className="text-white/60 font-medium">+</span> → <span className="text-white/60 font-medium">Add from clipboard</span></li>
+                    <li>3. Paste the link into the application</li>
                     <li>4. Click <span className="text-white/60 font-medium">Connect</span></li>
                   </ol>
                 </div>

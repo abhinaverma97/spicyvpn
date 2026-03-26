@@ -334,18 +334,18 @@ export default function Dashboard({ user }: { user: User }) {
                     </div>
                     <span className="text-lg font-bold text-white/80">Windows</span>
                     <a
-                      href="https://github.com/spicyvpn365/spicyvpn/releases/download/win/SpicyVPN_0.1.0_x64-setup.exe"
+                      href="https://github.com/hiddify/hiddify-app/releases/latest/download/Hiddify-Windows-Setup-x64.exe"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="ml-auto text-sm font-bold px-4 py-2 rounded-xl border border-white/10 text-white/50 hover:border-white/30 hover:text-white transition-all bg-white/5"
                     >
-                      Download App
+                      Download Hiddify
                     </a>
                   </div>
                   <ol className="space-y-2 text-base text-white/30 ml-4 border-l border-white/5 pl-6">
-                    <li>1. Download and install <span className="text-white/60 font-medium">Spicyclient</span></li>
+                    <li>1. Download and install <span className="text-white/60 font-medium">Hiddify</span> for Windows</li>
                     <li>2. Copy your subscription link</li>
-                    <li>3. Paste the link into the application</li>
+                    <li>3. Open Hiddify → click <span className="text-white/60 font-medium">+</span> → <span className="text-white/60 font-medium">Add from clipboard</span></li>
                     <li>4. Click <span className="text-white/60 font-medium">Connect</span></li>
                   </ol>
                 </div>

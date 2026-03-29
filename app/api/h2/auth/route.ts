@@ -42,9 +42,12 @@ export async function POST(req: Request) {
     }
 
     console.log(`H2 Auth Success: User ${config.email} connected`);
-    return new Response(JSON.stringify({ ok: true }), {
+    return new Response(JSON.stringify({ ok: true, id: config.token }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-Hysteria-Id': config.token
+      }
     });
 
   } catch (error) {

@@ -45,12 +45,12 @@ export async function GET() {
   const countRow = db.prepare("SELECT COUNT(*) as count FROM users").get() as any;
   const totalUsersCount = countRow.count;
   
-  const activeConfigs = db.prepare("SELECT COUNT(*) as count FROM vpn_configs WHERE active = 1").get() as any;
+  const activeConfigsRow = db.prepare("SELECT COUNT(*) as count FROM vpn_configs WHERE active = 1").get() as any;
+  const activeConfigsCount = activeConfigsRow.count;
 
-  // 2. Threshold for live check
+  // 2. Threshold for live check (last 60 seconds)
   const now = Math.floor(Date.now() / 1000);
-  // Active in the last 5 minutes
-  const ACTIVE_THRESHOLD = now - 300; 
+  const ACTIVE_THRESHOLD = now - 60; 
 
   const globalTraffic = db.prepare(`
     SELECT SUM(totalUp) as up, SUM(totalDown) as down,
@@ -92,7 +92,7 @@ export async function GET() {
     liveUsers: liveUsers, 
     hysteriaStatus: "active",
     totalUsers: totalUsersCount,
-    activeUsers: activeConfigs.count,
+    activeUsers: activeConfigsCount,
     totalTrafficBytes: totalTraffic,
   });
 }

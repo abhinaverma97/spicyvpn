@@ -27,6 +27,7 @@ async function trackTraffic() {
     `);
 
     db.transaction(() => {
+      let updated = 0;
       for (const [token, stats] of Object.entries(data)) {
         if (!token) continue; // Skip empty token mapping
         
@@ -41,7 +42,11 @@ async function trackTraffic() {
 
         if (diffTx > 0 || diffRx > 0) {
           updateStmt.run(diffTx, diffRx, now, token);
+          updated++;
         }
+      }
+      if (updated > 0) {
+        console.log(`[${new Date().toISOString()}] Updated stats for ${updated} active users.`);
       }
     })();
 

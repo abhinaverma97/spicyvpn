@@ -96,18 +96,11 @@ export default function Dashboard({ user }: { user: User }) {
     return `https://spicypepper.app/api/sub?token=${config.token}`;
   }
 
-  function desktopUri() {
-    if (!config) return "";
-    return `hy2://${config.token}@140.245.13.64:8388?insecure=1&sni=www.microsoft.com#SpicyVPN-${user.name?.split(" ")[0] || "User"}`;
+  function copySubUrl() {
+    navigator.clipboard.writeText(subUrl());
+    setCopiedSub(true);
+    setTimeout(() => setCopiedSub(false), 2000);
   }
-
-  function copyText(text: string, setCopied: (v: boolean) => void) {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
-  const [copiedDesktop, setCopiedDesktop] = useState(false);
 
   function daysLeft(expiresAt: string) {
     const diff = new Date(expiresAt).getTime() - Date.now();
@@ -176,7 +169,7 @@ export default function Dashboard({ user }: { user: User }) {
         <div className="mb-10">
           <h1 className="text-3xl font-black mb-2 tracking-tight">Your VPN Access</h1>
           <p className="text-white/40 text-lg">
-            Import the <strong className="text-white/70 font-bold">Sub Link</strong> into Hiddify or the <strong className="text-blue-400 font-bold">Desktop URI</strong> into the SpicyVPN App.
+            Copy your subscription link and import it into Hiddify or SpicyVPN Desktop.
           </p>
         </div>
 
@@ -224,86 +217,44 @@ export default function Dashboard({ user }: { user: User }) {
               </GlassCard>
             </div>
 
-            {/* Access Links */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Subscription Link */}
-              <GlassCard className="p-8 space-y-6 border-white/5" intensity={0.08}>
-                <div className="flex items-start sm:items-center justify-between flex-col sm:flex-row gap-4">
-                  <div>
-                    <h2 className="text-2xl font-bold text-white/90 mb-1">Hiddify Link</h2>
-                    <p className="text-white/40 text-sm">
-                      For Hiddify (Mobile & Desktop)
-                    </p>
-                  </div>
-                  <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 px-4 py-1.5 text-sm font-bold shrink-0">
-                    <Check className="w-4 h-4 mr-2" /> Sub Link
-                  </Badge>
+            {/* Subscription Link */}
+            <GlassCard className="p-8 space-y-6 border-white/5" intensity={0.08}>
+              <div className="flex items-start sm:items-center justify-between flex-col sm:flex-row gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-white/90 mb-1">Subscription Link</h2>
+                  <p className="text-white/40 text-base">
+                    Copy this link and import it into Hiddify or SpicyVPN Desktop.
+                  </p>
                 </div>
-                
-                <div className="space-y-4">
-                  <div className="bg-black/40 rounded-xl p-5 flex items-center justify-between border border-white/5 gap-4 backdrop-blur-md">
-                    <code className="text-sm font-mono text-white/50 break-all leading-relaxed flex-1">
-                      {subUrl()}
-                    </code>
-                    <button
-                      onClick={() => copyText(subUrl(), setCopiedSub)}
-                      className="shrink-0 text-white/30 hover:text-white transition-colors p-2 hover:bg-white/5 rounded-lg"
-                    >
-                      {copiedSub ? <Check className="w-6 h-6 text-emerald-400" /> : <Copy className="w-6 h-6" />}
-                    </button>
-                  </div>
-                  <Button
-                    onClick={() => copyText(subUrl(), setCopiedSub)}
-                    className="w-full bg-white/10 backdrop-blur-md text-white hover:bg-white/20 border border-white/10 font-black py-7 text-lg rounded-xl shadow-2xl transition-all transform active:scale-[0.98]"
+                <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 px-4 py-1.5 text-sm font-bold shrink-0">
+                  <Check className="w-4 h-4 mr-2" /> Active
+                </Badge>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="bg-black/40 rounded-xl p-5 flex items-center justify-between border border-white/5 gap-4 backdrop-blur-md">
+                  <code className="text-base font-mono text-white/50 break-all leading-relaxed flex-1">
+                    {subUrl()}
+                  </code>
+                  <button
+                    onClick={copySubUrl}
+                    className="shrink-0 text-white/30 hover:text-white transition-colors p-2 hover:bg-white/5 rounded-lg"
                   >
-                    {copiedSub ? (
-                      <><Check className="w-6 h-6 mr-3 text-emerald-400" /> Copied!</>
-                    ) : (
-                      <><Copy className="w-6 h-6 mr-3 text-white/60" /> Copy Sub Link</>
-                    )}
-                  </Button>
+                    {copiedSub ? <Check className="w-6 h-6 text-emerald-400" /> : <Copy className="w-6 h-6" />}
+                  </button>
                 </div>
-              </GlassCard>
-
-              {/* Desktop Direct Link */}
-              <GlassCard className="p-8 space-y-6 border-white/5" intensity={0.08}>
-                <div className="flex items-start sm:items-center justify-between flex-col sm:flex-row gap-4">
-                  <div>
-                    <h2 className="text-2xl font-bold text-white/90 mb-1">Desktop URI</h2>
-                    <p className="text-white/40 text-sm">
-                      For SpicyVPN Desktop App
-                    </p>
-                  </div>
-                  <Badge className="bg-blue-500/10 text-blue-400 border-blue-500/20 px-4 py-1.5 text-sm font-bold shrink-0">
-                    <Check className="w-4 h-4 mr-2" /> Direct URI
-                  </Badge>
-                </div>
-                
-                <div className="space-y-4">
-                  <div className="bg-black/40 rounded-xl p-5 flex items-center justify-between border border-white/5 gap-4 backdrop-blur-md">
-                    <code className="text-sm font-mono text-white/50 break-all leading-relaxed flex-1">
-                      {desktopUri()}
-                    </code>
-                    <button
-                      onClick={() => copyText(desktopUri(), setCopiedDesktop)}
-                      className="shrink-0 text-white/30 hover:text-white transition-colors p-2 hover:bg-white/5 rounded-lg"
-                    >
-                      {copiedDesktop ? <Check className="w-6 h-6 text-emerald-400" /> : <Copy className="w-6 h-6" />}
-                    </button>
-                  </div>
-                  <Button
-                    onClick={() => copyText(desktopUri(), setCopiedDesktop)}
-                    className="w-full bg-white/10 backdrop-blur-md text-white hover:bg-white/20 border border-white/10 font-black py-7 text-lg rounded-xl shadow-2xl transition-all transform active:scale-[0.98]"
-                  >
-                    {copiedDesktop ? (
-                      <><Check className="w-6 h-6 mr-3 text-emerald-400" /> Copied!</>
-                    ) : (
-                      <><Copy className="w-6 h-6 mr-3 text-white/60" /> Copy Desktop URI</>
-                    )}
-                  </Button>
-                </div>
-              </GlassCard>
-            </div>
+                <Button
+                  onClick={copySubUrl}
+                  className="w-full bg-white/10 backdrop-blur-md text-white hover:bg-white/20 border border-white/10 font-black py-7 text-lg rounded-xl shadow-2xl transition-all transform active:scale-[0.98]"
+                >
+                  {copiedSub ? (
+                    <><Check className="w-6 h-6 mr-3 text-emerald-400" /> Copied to clipboard!</>
+                  ) : (
+                    <><Copy className="w-6 h-6 mr-3 text-white/60" /> Copy subscription link</>
+                  )}
+                </Button>
+              </div>
+            </GlassCard>
 
             {/* WhatsApp Community Card - Premium Glass Style */}
             <GlassCard 
@@ -344,7 +295,7 @@ export default function Dashboard({ user }: { user: User }) {
               <div className="p-8 pb-4">
                 <h3 className="text-xl font-bold text-white/90 mb-1">How to connect</h3>
                 <p className="text-white/40 text-base">
-                  Use <span className="text-white/70 font-bold underline decoration-white/20">Hiddify</span> — free, open-source, works on all platforms
+                  Use <span className="text-white/70 font-bold underline decoration-white/20">Hiddify</span> or our SpicyVPN Desktop App
                 </p>
               </div>
               
@@ -367,7 +318,7 @@ export default function Dashboard({ user }: { user: User }) {
                   </div>
                   <ol className="space-y-2 text-base text-white/30 ml-4 border-l border-white/5 pl-6">
                     <li>1. Install <span className="text-white/60 font-medium">Hiddify</span> from Play Store</li>
-                    <li>2. Copy the <span className="text-emerald-400 font-medium">Hiddify Link</span> from above</li>
+                    <li>2. Copy your link from the box above</li>
                     <li>3. Open Hiddify → tap <span className="text-white/60 font-medium">+</span> → <span className="text-white/60 font-medium">Add from clipboard</span></li>
                     <li>4. Tap <span className="text-white/60 font-medium">Connect</span></li>
                   </ol>
@@ -382,18 +333,28 @@ export default function Dashboard({ user }: { user: User }) {
                       <Monitor className="w-4 h-4 text-white/40" />
                     </div>
                     <span className="text-lg font-bold text-white/80">Windows</span>
-                    <a
-                      href="https://github.com/abhinaverma97/spicyvpn-desktop/releases/latest"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="ml-auto text-sm font-bold px-4 py-2 rounded-xl border border-white/10 text-white/50 hover:border-white/30 hover:text-white transition-all bg-white/5"
-                    >
-                      Desktop App
-                    </a>
+                    <div className="ml-auto flex gap-2">
+                      <a
+                        href="https://github.com/abhinaverma97/spicyvpn-desktop/releases/latest"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-bold px-4 py-2 rounded-xl border border-emerald-500/20 text-emerald-400 hover:border-emerald-500/40 hover:text-emerald-300 transition-all bg-emerald-500/5"
+                      >
+                        Spicy App
+                      </a>
+                      <a
+                        href="https://github.com/hiddify/hiddify-app/releases/latest"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-bold px-4 py-2 rounded-xl border border-white/10 text-white/50 hover:border-white/30 hover:text-white transition-all bg-white/5"
+                      >
+                        Hiddify
+                      </a>
+                    </div>
                   </div>
                   <ol className="space-y-2 text-base text-white/30 ml-4 border-l border-white/5 pl-6">
                     <li>1. Install <span className="text-white/60 font-medium">SpicyVPN Desktop</span></li>
-                    <li>2. Copy the <span className="text-blue-400 font-medium">Desktop URI</span> from above</li>
+                    <li>2. Copy your link from the box above</li>
                     <li>3. Paste into the app and click <span className="text-white/60 font-medium">Save Gateway</span></li>
                     <li>4. Click <span className="text-white/60 font-medium">Connect</span></li>
                   </ol>
@@ -409,7 +370,7 @@ export default function Dashboard({ user }: { user: User }) {
                     </div>
                     <span className="text-lg font-bold text-white/80">macOS</span>
                     <a
-                      href="https://github.com/hiddify/hiddify-app/releases/download/v4.1.1/Hiddify-MacOS.dmg"
+                      href="https://github.com/hiddify/hiddify-app/releases/latest"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="ml-auto text-sm font-bold px-4 py-2 rounded-xl border border-white/10 text-white/50 hover:border-white/30 hover:text-white transition-all bg-white/5"

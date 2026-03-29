@@ -9,11 +9,15 @@ import {
   Trash2, 
   Search,
   RefreshCw,
-  Database,
   ChevronDown,
   LogOut,
   ArrowUpRight,
-  MoreHorizontal
+  Wifi,
+  Shield,
+  Check,
+  Smartphone,
+  Monitor,
+  Clock
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { signOut } from "next-auth/react";
@@ -26,14 +30,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Footer from "./Footer";
+import GlassCard from "./GlassCard";
+import dynamic from "next/dynamic";
 
-type Stats = {
-  totalUsers: number;
-  activeConfigs: number;
-  expiredConfigs: number;
-  totalConfigs: number;
-  capacity: number;
-};
+const Dither = dynamic(() => import("./Dither"), { ssr: false });
 
 type User = {
   id: string;
@@ -44,8 +44,6 @@ type User = {
   uuid: string | null;
   expiresAt: string | null;
   active: boolean;
-  deviceCount: number;
-  lastActive: number | null;
   usedTraffic: number;
   dataLimit: number;
 };
@@ -58,26 +56,24 @@ type VpsStats = {
   network: { rx: number; tx: number };
   connections: number;
   liveUsers: string[];
-  userTraffic: Record<string, { up: number; down: number }>;
   totalUsers: number;
   activeUsers: number;
   totalTrafficBytes: number;
 };
 
 function fmt(bytes: number) {
-  if (bytes === -1) return "Unlimited";
+  if (bytes === -1 || bytes === undefined) return "0.0 KB";
   if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(2) + " GB";
   if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + " MB";
   return (bytes / 1024).toFixed(0) + " KB";
 }
 
-export default function AdminDashboard({ stats: initialStats, users: initialUsers }: { stats: Stats; users: User[] }) {
+export default function AdminDashboard({ users: initialUsers }: { users: User[] }) {
   const [mounted, setMounted] = useState(false);
   const [users, setUsers] = useState<User[]>(initialUsers);
   const [vps, setVps] = useState<VpsStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
   async function refreshData() {
@@ -91,13 +87,7 @@ export default function AdminDashboard({ stats: initialStats, users: initialUser
       if (vpsRes.ok) setVps(await vpsRes.json());
       if (usersRes.ok) {
         const data = await usersRes.json();
-        setUsers(data.map((u: any) => ({
-          ...u,
-          joinedAt: u.createdAt ? new Date(u.createdAt * 1000).toISOString() : new Date().toISOString(),
-          active: Boolean(u.active),
-          expiresAt: u.expiresAt ? new Date(u.expiresAt * 1000).toISOString() : null,
-          lastActive: Number(u.lastActive || 0),
-        })));
+        setUsers(data);
       }
     } catch (err) {
       console.error("Refresh error:", err);
@@ -109,21 +99,19 @@ export default function AdminDashboard({ stats: initialStats, users: initialUser
   useEffect(() => {
     setMounted(true);
     refreshData();
-    const interval = setInterval(refreshData, 15000);
+    const interval = setInterval(refreshData, 10000);
     return () => clearInterval(interval);
   }, []);
 
   async function deleteUser(id: string) {
-    setDeleting(id);
     await fetch("/api/admin", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: id }) });
     setUsers(u => u.filter(x => x.id !== id));
-    setDeleting(null);
     setConfirmId(null);
   }
 
   function daysLeft(expiresAt: any) {
     if (!expiresAt) return -1;
-    const expiry = typeof expiresAt === 'number' ? expiresAt * 1000 : new Date(expiresAt).getTime();
+    const expiry = new Date(expiresAt).getTime();
     const diff = expiry - Date.now();
     return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
   }
@@ -143,163 +131,205 @@ export default function AdminDashboard({ stats: initialStats, users: initialUser
     return b.usedTraffic - a.usedTraffic;
   });
 
-  const liveCount = vps?.liveUsers?.length || 0;
+  const liveCount = vps?.connections || 0;
 
   return (
-    <div className="min-h-screen bg-[#000] text-[#fafafa] font-sans antialiased flex flex-col">
-      {/* Top Navbar */}
-      <nav className="border-b border-zinc-800 bg-[#09090b] px-6 py-4 flex items-center justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-3">
-            <span className="font-bold text-lg tracking-tight uppercase">Admin Console</span>
-          </div>
-          <div className="hidden md:flex items-center gap-4 border-l border-zinc-800 pl-6">
-            <button 
-              onClick={() => window.location.href = "/dashboard"}
-              className="flex items-center gap-2 text-sm font-medium text-zinc-400 hover:text-white transition-colors"
-            >
-              <ArrowUpRight className="w-4 h-4" /> User Dashboard
-            </button>
-          </div>
-        </div>
+    <div className="relative min-h-screen bg-black text-white overflow-x-hidden no-scrollbar">
+      {/* Background Dither */}
+      <div className="fixed inset-0 z-0 pointer-events-none opacity-40 hidden sm:block">
+        <Dither />
+        <div className="absolute inset-0 bg-black/70" />
+      </div>
 
-        <div className="flex items-center gap-4">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={refreshData}
-            className="hidden sm:flex bg-transparent border-zinc-800 hover:bg-zinc-900 text-zinc-400"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Sync
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="flex items-center gap-2 text-white hover:bg-zinc-900">
-                <Avatar className="w-7 h-7 border border-zinc-700">
-                  <AvatarFallback className="bg-zinc-800 text-xs">AD</AvatarFallback>
-                </Avatar>
-                <ChevronDown className="w-3 h-3 text-zinc-500" />
+      <div className="relative z-10 flex flex-col min-h-screen">
+        {/* Nav */}
+        <nav className="border-b border-white/10 px-6 py-4 backdrop-blur-md bg-black/20 sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              <a href="/" className="flex items-center gap-2 hover:opacity-70 transition-opacity">
+                <span className="font-semibold tracking-tight uppercase">SpicyVPN</span>
+              </a>
+              <div className="hidden md:flex items-center gap-4 border-l border-white/10 pl-6">
+                <button 
+                  onClick={() => window.location.href = "/dashboard"}
+                  className="flex items-center gap-2 text-xs font-medium text-white/40 hover:text-white transition-colors uppercase tracking-widest"
+                >
+                  <ArrowUpRight className="w-3.5 h-3.5" /> User View
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={refreshData}
+                className="bg-white/5 border border-white/5 hover:bg-white/10 text-white/70 h-8 text-[10px] font-bold uppercase tracking-widest"
+              >
+                <RefreshCw className={`w-3 h-3 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                Sync
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-zinc-900 border-zinc-800 text-white min-w-[150px]">
-              <DropdownMenuItem onClick={() => window.location.href = "/dashboard"} className="md:hidden cursor-pointer">
-                User Dashboard
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/" })} className="text-red-400 focus:text-red-400 cursor-pointer">
-                <LogOut className="w-4 h-4 mr-2" /> Sign out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full space-y-8">
-        
-        {/* Key Metrics Header */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-[#09090b] border border-zinc-800 p-5 rounded-xl flex flex-col justify-between">
-            <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Registered</span>
-            <div className="text-3xl font-black text-white">{vps?.totalUsers || 0}</div>
-          </div>
-          <div className="bg-[#09090b] border border-zinc-800 p-5 rounded-xl flex flex-col justify-between">
-            <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Active Subs</span>
-            <div className="text-3xl font-black text-emerald-400">{vps?.activeUsers || 0}</div>
-          </div>
-          <div className="bg-[#09090b] border border-zinc-800 p-5 rounded-xl flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Live Conn</span>
-              <div className={`w-2 h-2 rounded-full ${liveCount > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-700'}`} />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="flex items-center gap-2 text-white/70 hover:text-white h-8">
+                    <Avatar className="w-6 h-6 border border-white/10">
+                      <AvatarFallback className="bg-white/5 text-[10px]">AD</AvatarFallback>
+                    </Avatar>
+                    <ChevronDown className="w-3 h-3 text-white/30" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-zinc-900 border-white/10 text-white min-w-[150px]">
+                  <DropdownMenuItem onClick={() => window.location.href = "/dashboard"} className="md:hidden cursor-pointer text-xs uppercase font-bold">
+                    User Dashboard
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/" })} className="text-red-400 focus:text-red-400 cursor-pointer text-xs uppercase font-bold">
+                    <LogOut className="w-4 h-4 mr-2" /> Sign out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-            <div className="text-3xl font-black text-blue-400">{liveCount}</div>
           </div>
-          <div className="bg-[#09090b] border border-zinc-800 p-5 rounded-xl flex flex-col justify-between">
-            <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Total TX</span>
-            <div className="text-3xl font-black text-white">{fmt(vps?.totalTrafficBytes || 0)}</div>
-          </div>
-        </div>
+        </nav>
 
-        {/* User Registry List */}
-        <div className="space-y-4 animate-in slide-in-from-bottom-2 duration-500">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="text-xl font-bold tracking-tight">User Registry</h2>
-            <div className="relative w-full max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-              <input 
-                type="text"
-                placeholder="Search database..."
-                className="w-full bg-[#09090b] border border-zinc-800 rounded-lg pl-9 pr-4 py-2.5 text-sm text-zinc-200 focus:border-zinc-600 outline-none transition-all placeholder:text-zinc-600"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
+        {/* Main Content */}
+        <main className="relative z-10 max-w-7xl mx-auto px-6 py-12 w-full space-y-10">
+          
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div>
+              <h1 className="text-3xl font-black mb-2 tracking-tight uppercase">Admin Console</h1>
+              <p className="text-white/40 text-lg uppercase tracking-widest text-xs font-bold">Full Fleet Management & Node Telemetry</p>
+            </div>
+            
+            {/* Engine Stats */}
+            <div className="flex gap-10">
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em]">Engine Load</span>
+                <div className="text-xl font-bold text-white/80">{vps?.cpu.pct || 0}% <span className="text-[10px] text-white/20">CPU</span></div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em]">Memory</span>
+                <div className="text-xl font-bold text-white/80">{vps?.ram.pct || 0}% <span className="text-[10px] text-white/20">RAM</span></div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em]">Online</span>
+                <div className="flex items-center gap-2">
+                  <div className="text-xl font-bold text-emerald-400">{liveCount}</div>
+                  <div className={`w-1.5 h-1.5 rounded-full ${liveCount > 0 ? 'bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]' : 'bg-zinc-700'}`} />
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="bg-[#09090b] border border-zinc-800 rounded-xl overflow-hidden shadow-2xl">
+          {/* Quick Metrics */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <GlassCard className="p-6 border-white/5" intensity={0.05}>
+              <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2 block">Total Registry</span>
+              <div className="text-3xl font-black text-white">{vps?.totalUsers || 0}</div>
+            </GlassCard>
+            <GlassCard className="p-6 border-white/5" intensity={0.05}>
+              <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2 block">Active Subs</span>
+              <div className="text-3xl font-black text-blue-400">{vps?.activeUsers || 0}</div>
+            </GlassCard>
+            <GlassCard className="p-6 border-white/5" intensity={0.05}>
+              <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2 block">Uptime</span>
+              <div className="text-3xl font-black text-white/80 uppercase tracking-tighter">{vps?.uptime.split(' ')[0]} <span className="text-xs text-white/20">Days</span></div>
+            </GlassCard>
+            <GlassCard className="p-6 border-white/5" intensity={0.05}>
+              <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2 block">Network Total</span>
+              <div className="text-3xl font-black text-emerald-400 truncate">{fmt(vps?.totalTrafficBytes || 0)}</div>
+            </GlassCard>
+          </div>
+
+          {/* User List */}
+          <GlassCard className="overflow-hidden border-white/5" intensity={0.08}>
+            <div className="p-6 border-b border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                <Users className="w-5 h-5 text-white/30" /> Identity Registry
+              </h2>
+              <div className="relative w-full max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+                <input 
+                  type="text"
+                  placeholder="Filter users..."
+                  className="w-full bg-black/40 border border-white/5 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white/70 focus:border-white/20 outline-none transition-all placeholder:text-white/10"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                />
+              </div>
+            </div>
+
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[800px]">
-                <thead className="bg-[#111113] border-b border-zinc-800">
-                  <tr className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">
-                    <th className="px-6 py-4">Identity</th>
-                    <th className="px-6 py-4 text-center">Status</th>
-                    <th className="px-6 py-4">Data Volume</th>
-                    <th className="px-6 py-4 text-right">Expiration</th>
-                    <th className="px-6 py-4 text-right pr-6">Manage</th>
+              <table className="w-full text-left border-collapse min-w-[900px]">
+                <thead className="bg-white/5 border-b border-white/5">
+                  <tr className="text-[10px] uppercase tracking-widest text-white/30 font-bold">
+                    <th className="px-8 py-5">Identity</th>
+                    <th className="px-8 py-5 text-center">Status</th>
+                    <th className="px-8 py-5">Data Consumed</th>
+                    <th className="px-8 py-5 text-right">Validity</th>
+                    <th className="px-8 py-5 text-right pr-10">Manage</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800/50">
+                <tbody className="divide-y divide-white/5">
                   {sortedUsers.map((u, i) => {
                     const isLive = vps?.liveUsers?.includes(u.uuid as string);
-                    // We know data limit is fixed at 35GB via the backend now, but we display what the frontend knows
                     const limit = 35 * 1024 * 1024 * 1024;
                     const usagePct = (u.usedTraffic / limit) * 100;
                     
                     return (
-                      <tr key={i} className="group hover:bg-zinc-900/40 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-lg border flex items-center justify-center text-xs font-bold shrink-0 ${isLive ? 'bg-white border-white text-black' : 'bg-zinc-900 border-zinc-800 text-zinc-500'}`}>
+                      <tr key={i} className={`group transition-all duration-300 ${isLive ? 'bg-emerald-500/[0.02]' : 'hover:bg-white/[0.02]'}`}>
+                        <td className="px-8 py-6">
+                          <div className="flex items-center gap-4">
+                            <div className={`w-10 h-10 rounded-xl border flex items-center justify-center font-bold text-sm shrink-0 transition-all duration-500 ${isLive ? 'bg-white border-white text-black scale-105 shadow-[0_0_15px_rgba(255,255,255,0.2)]' : 'bg-white/5 border-white/5 text-white/30'}`}>
                               {u.name[0]}
                             </div>
                             <div className="min-w-0">
-                              <p className="text-sm font-semibold text-zinc-200 truncate">{u.name}</p>
-                              <p className="text-[11px] text-zinc-500 truncate">{u.email}</p>
+                              <p className="text-sm font-bold text-white/90 truncate">{u.name}</p>
+                              <p className="text-[11px] text-white/20 truncate font-mono">{u.email}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-center">
+                        <td className="px-8 py-6 text-center">
                           {isLive ? (
-                            <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[9px] font-bold uppercase rounded px-2 py-0.5">Live</Badge>
+                            <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[9px] font-bold uppercase tracking-widest px-3 py-1 rounded-full">
+                              Live Now
+                            </Badge>
                           ) : (
-                            <Badge className="bg-transparent text-zinc-600 border-zinc-800 text-[9px] font-bold uppercase rounded px-2 py-0.5">Offline</Badge>
+                            <Badge className="bg-transparent text-white/20 border-white/5 text-[9px] font-bold uppercase tracking-widest px-3 py-1 rounded-full">
+                              Offline
+                            </Badge>
                           )}
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="w-40 space-y-1.5">
-                            <div className="flex justify-between text-[11px] font-medium text-zinc-400">
-                              <span>{fmt(u.usedTraffic)}</span>
-                              <span>35 GB</span>
+                        <td className="px-8 py-6">
+                          <div className="w-48 space-y-2">
+                            <div className="flex justify-between text-[10px] font-bold">
+                              <span className={isLive ? "text-emerald-400" : "text-white/40"}>{fmt(u.usedTraffic)}</span>
+                              <span className="text-white/10 uppercase tracking-tighter italic">Cap 35 GB</span>
                             </div>
-                            <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
-                              <div className={`h-full ${usagePct > 90 ? 'bg-red-500' : 'bg-zinc-300'}`} style={{ width: `${Math.min(100, usagePct)}%` }} />
+                            <div className="h-1 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                              <div 
+                                className={`h-full transition-all duration-1000 ${usagePct > 90 ? 'bg-red-500' : isLive ? 'bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-white/20'}`} 
+                                style={{ width: `${Math.min(100, usagePct)}%` }} 
+                              />
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-right">
-                          <p className={`text-xs font-semibold ${daysLeft(u.expiresAt) !== -1 && daysLeft(u.expiresAt) < 3 ? 'text-red-400' : 'text-zinc-300'}`}>
-                            {u.expiresAt ? `${daysLeft(u.expiresAt)} Days` : 'No Plan'}
-                          </p>
+                        <td className="px-8 py-6 text-right">
+                          <div className="inline-flex flex-col items-end">
+                            <p className={`text-xs font-bold ${daysLeft(u.expiresAt) !== -1 && daysLeft(u.expiresAt) < 3 ? 'text-red-400' : 'text-white/70'}`}>
+                              {daysLeft(u.expiresAt) === -1 ? 'NO PLAN' : `${daysLeft(u.expiresAt)} DAYS`}
+                            </p>
+                            <p className="text-[9px] text-white/10 font-bold uppercase tracking-widest mt-0.5">Remaining</p>
+                          </div>
                         </td>
-                        <td className="px-6 py-4 text-right pr-6">
+                        <td className="px-8 py-6 text-right pr-10">
                           <div className="flex items-center justify-end">
                             {confirmId === u.id ? (
-                              <div className="flex items-center gap-2">
-                                <button onClick={() => deleteUser(u.id)} className="text-[11px] font-bold text-red-400 bg-red-400/10 px-2 py-1 rounded hover:bg-red-400/20 transition-colors">Confirm</button>
-                                <button onClick={() => setConfirmId(null)} className="text-[11px] font-bold text-zinc-500 hover:text-zinc-300 px-1">Cancel</button>
+                              <div className="flex items-center gap-2 animate-in zoom-in-95">
+                                <button onClick={() => deleteUser(u.id)} className="text-[10px] font-bold text-red-400 bg-red-400/10 px-3 py-1.5 rounded-lg border border-red-400/20 hover:bg-red-400/20 transition-all uppercase tracking-widest">Revoke</button>
+                                <button onClick={() => setConfirmId(null)} className="text-[10px] font-bold text-white/30 uppercase px-2">Esc</button>
                               </div>
                             ) : (
-                              <button onClick={() => setConfirmId(u.id)} className="p-1.5 text-zinc-600 hover:text-red-400 hover:bg-zinc-800 rounded transition-colors">
+                              <button onClick={() => setConfirmId(u.id)} className="p-2.5 text-white/10 hover:text-red-400 hover:bg-white/5 rounded-xl transition-all">
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             )}
@@ -313,15 +343,16 @@ export default function AdminDashboard({ stats: initialStats, users: initialUser
             </div>
             
             {sortedUsers.length === 0 && (
-              <div className="p-12 text-center text-zinc-500 text-sm">
-                No users found matching your search.
+              <div className="p-24 text-center flex flex-col items-center gap-4 opacity-30">
+                <Shield className="w-12 h-12 mb-2" />
+                <p className="text-sm font-bold uppercase tracking-widest">Registry Search Empty</p>
               </div>
             )}
-          </div>
-        </div>
-      </main>
-      
-      <Footer />
+          </GlassCard>
+        </main>
+        
+        <Footer />
+      </div>
     </div>
   );
 }

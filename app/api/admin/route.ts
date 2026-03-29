@@ -27,8 +27,7 @@ export async function GET() {
   const users = dbUsers.map(u => ({
     ...u,
     usedTraffic: (u.totalUp || 0) + (u.totalDown || 0),
-    dataLimit: u.dataLimit || -1,
-    marzbanStatus: u.active ? 'active' : 'disabled'
+    dataLimit: u.dataLimit || -1
   }));
 
   return NextResponse.json(users);

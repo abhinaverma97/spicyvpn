@@ -1,45 +1,44 @@
-import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { NextResponse } from "next/server";
 
 export const dynamic = 'force-dynamic';
 
-const TRAFFIC_LIMIT = 35 * 1024 * 1024 * 1024; // 35GB
-
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const { auth } = await req.json();
-    
-    if (!auth) {
-      return NextResponse.json({ ok: false, error: "Missing auth" }, { status: 400 });
-    }
+    const { user, password } = await req.json();
 
+    // In our system, the 'password' is the user's private token
     const db = getDb();
-    const now = Math.floor(Date.now() / 1000);
-
-    // 1. Find the config in our DB
-    // Pass both 'auth' (uuid) and 'now' (expiry check) parameters
     const config = db.prepare(`
-      SELECT * FROM vpn_configs 
-      WHERE uuid = ? AND active = 1 AND expiresAt > ?
-    `).get(auth, now) as any;
+      SELECT vc.*, u.email 
+      FROM vpn_configs vc
+      JOIN users u ON vc.userId = u.id
+      WHERE vc.token = ? AND vc.active = 1
+    `).get(password) as any;
 
     if (!config) {
-      console.warn(`Auth failed (No active config or expired): ${auth}`);
-      return NextResponse.json({ ok: false }, { status: 401 });
+      console.log(`H2 Auth Failed: Token ${password} not found or inactive`);
+      return new Response("Unauthorized", { status: 401 });
     }
 
-    // 2. Check Traffic Limit using persistent DB tracking
-    const totalUsed = (config.totalUp || 0) + (config.totalDown || 0);
-    if (totalUsed >= TRAFFIC_LIMIT) {
-      console.warn(`Auth denied (Traffic Limit Exceeded): ${auth} - Used: ${totalUsed}`);
-      return NextResponse.json({ ok: false, reason: "limit exceeded" }, { status: 403 });
+    const now = Math.floor(Date.now() / 1000);
+    if (config.expiresAt < now) {
+      console.log(`H2 Auth Failed: Token ${password} expired`);
+      return new Response("Expired", { status: 403 });
     }
 
-    // 3. Success
-    return NextResponse.json({ ok: true, id: auth });
+    // Check traffic limit (35GB)
+    const TRAFFIC_LIMIT = 35 * 1024 * 1024 * 1024;
+    if (config.totalUp + config.totalDown >= TRAFFIC_LIMIT) {
+      console.log(`H2 Auth Failed: Token ${password} limit reached`);
+      return new Response("Limit Reached", { status: 402 });
+    }
+
+    console.log(`H2 Auth Success: User ${config.email} connected`);
+    return NextResponse.json({ ok: true });
 
   } catch (error) {
-    console.error("H2 Auth Hook Error:", error);
-    return NextResponse.json({ ok: false }, { status: 500 });
+    console.error("H2 Auth Error:", error);
+    return new Response("Internal Error", { status: 500 });
   }
 }

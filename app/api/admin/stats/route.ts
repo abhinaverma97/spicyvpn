@@ -4,7 +4,6 @@ import { getDb } from "@/lib/db";
 import os from "os";
 import { exec } from "child_process";
 import { promisify } from "util";
-import { getMarzbanUsers } from "@/lib/marzban";
 
 const execAsync = promisify(exec);
 
@@ -43,63 +42,31 @@ export async function GET() {
   const db = getDb();
   
   // 1. Basic Local Stats
-  const totalConfigs = db.prepare("SELECT COUNT(*) as count FROM vpn_configs").get() as any;
+  const countRow = db.prepare("SELECT COUNT(*) as count FROM users").get() as any;
+  const totalUsersCount = countRow.count;
+  
   const activeConfigs = db.prepare("SELECT COUNT(*) as count FROM vpn_configs WHERE active = 1").get() as any;
 
   // 2. Threshold for live check
-  const now = new Date();
-  const LIVE_THRESHOLD_MS = 120 * 1000; // 2 minutes
+  const now = Math.floor(Date.now() / 1000);
+  // Active in the last 5 minutes
+  const ACTIVE_THRESHOLD = now - 300; 
 
-  let totalUp = 0;
-  let totalDown = 0;
-  let totalTraffic = 0;
-  let liveConnections = 0;
-  const liveUsers: string[] = [];
-  const userTraffic: Record<string, { up: number; down: number; lastActive: number }> = {};
+  const globalTraffic = db.prepare(`
+    SELECT SUM(totalUp) as up, SUM(totalDown) as down,
+    (SELECT COUNT(*) FROM vpn_configs WHERE lastActive >= ?) as live_count
+    FROM vpn_configs
+  `).get(ACTIVE_THRESHOLD) as any;
+  
+  const totalUp = globalTraffic.up || 0;
+  const totalDown = globalTraffic.down || 0;
+  const totalTraffic = totalUp + totalDown;
+  const liveConnections = globalTraffic.live_count;
 
-  // --- Fetch from Marzban (Source of Truth) ---
-  try {
-    const mUsers = await getMarzbanUsers();
+  const liveFromDb = db.prepare(`SELECT uuid FROM vpn_configs WHERE lastActive >= ?`).all(ACTIVE_THRESHOLD) as any[];
+  const liveUsers = liveFromDb.map((row: any) => row.uuid);
 
-    let mTotalUsed = 0;
-    for (const u of mUsers) {
-      mTotalUsed += u.used_traffic || 0;
-      userTraffic[u.username] = { 
-        up: u.used_traffic || 0, 
-        down: 0, 
-        lastActive: u.online_at ? new Date(u.online_at).getTime() / 1000 : 0 
-      };
-      
-      // Calculate live users based on online_at
-      if (u.online_at) {
-        const onlineAt = new Date(u.online_at);
-        if (now.getTime() - onlineAt.getTime() < LIVE_THRESHOLD_MS) {
-          liveUsers.push(u.username);
-          liveConnections++;
-        }
-      }
-    }
-    
-    totalUp = mTotalUsed;
-    totalDown = 0;
-    totalTraffic = mTotalUsed;
-
-  } catch (err) {
-    console.error("Failed to fetch Marzban stats:", err);
-    // Fallback to local DB if Marzban fails
-    const ACTIVE_THRESHOLD = Math.floor(Date.now() / 1000) - 90;
-    const globalTraffic = db.prepare(`
-      SELECT SUM(totalUp) as up, SUM(totalDown) as down,
-      (SELECT COUNT(*) FROM vpn_configs WHERE lastActive >= ?) as live_count
-      FROM vpn_configs
-    `).get(ACTIVE_THRESHOLD) as any;
-    totalUp = globalTraffic.up || 0;
-    totalDown = globalTraffic.down || 0;
-    totalTraffic = totalUp + totalDown;
-    liveConnections = globalTraffic.live_count;
-  }
-
-  // 3. System Stats
+  // System Stats
   const cpus = os.cpus();
   const load = os.loadavg();
   const totalMem = os.totalmem();
@@ -124,8 +91,7 @@ export async function GET() {
     connections: liveConnections,
     liveUsers: liveUsers, 
     hysteriaStatus: "active",
-    userTraffic,
-    totalUsers: totalConfigs.count,
+    totalUsers: totalUsersCount,
     activeUsers: activeConfigs.count,
     totalTrafficBytes: totalTraffic,
   });

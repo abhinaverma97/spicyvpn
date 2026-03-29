@@ -2,24 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { 
-  Shield, 
   Users, 
-  Wifi, 
-  Clock, 
-  AlertCircle, 
   Cpu, 
   HardDrive, 
   Activity, 
-  ArrowUp, 
   Trash2, 
   Search,
   RefreshCw,
-  Circle,
   Database,
-  Check,
-  Zap,
   ChevronDown,
-  LogOut
+  LogOut,
+  ArrowUpRight,
+  MoreHorizontal
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { signOut } from "next-auth/react";
@@ -32,10 +26,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Footer from "./Footer";
-import GlassCard from "./GlassCard";
-import dynamic from "next/dynamic";
-
-const Dither = dynamic(() => import("./Dither"), { ssr: false });
 
 type Stats = {
   totalUsers: number;
@@ -82,14 +72,6 @@ function fmt(bytes: number) {
   return (bytes / 1024).toFixed(0) + " KB";
 }
 
-function StatBar({ pct, color = "bg-white" }: { pct: number; color?: string }) {
-  return (
-    <div className="mt-2 h-1.5 bg-white/5 rounded-full overflow-hidden">
-      <div className={`h-full ${color} rounded-full transition-all duration-1000`} style={{ width: `${Math.min(100, pct)}%` }} />
-    </div>
-  );
-}
-
 export default function AdminDashboard({ stats: initialStats, users: initialUsers }: { stats: Stats; users: User[] }) {
   const [mounted, setMounted] = useState(false);
   const [users, setUsers] = useState<User[]>(initialUsers);
@@ -129,7 +111,7 @@ export default function AdminDashboard({ stats: initialStats, users: initialUser
   useEffect(() => {
     setMounted(true);
     refreshData();
-    const interval = setInterval(refreshData, 30000);
+    const interval = setInterval(refreshData, 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -156,299 +138,281 @@ export default function AdminDashboard({ stats: initialStats, users: initialUser
     u.uuid?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const now = Math.floor(Date.now() / 1000);
+  const sortedUsers = [...filteredUsers].sort((a, b) => {
+    const aLive = vps?.liveUsers?.includes(a.uuid as string) ? 1 : 0;
+    const bLive = vps?.liveUsers?.includes(b.uuid as string) ? 1 : 0;
+    if (aLive !== bLive) return bLive - aLive;
+    return b.usedTraffic - a.usedTraffic;
+  });
+
   const liveCount = vps?.liveUsers?.length || 0;
   const connectionCount = vps?.connections || 0;
 
   return (
-    <div className="relative min-h-screen bg-black text-white overflow-x-hidden no-scrollbar font-sans">
-      {/* Background Dither */}
-      <div className="fixed inset-0 z-0 pointer-events-none opacity-40 hidden sm:block">
-        <Dither />
-        <div className="absolute inset-0 bg-black/70" />
-      </div>
-
-      <div className="relative z-10 flex flex-col min-h-screen">
-        {/* Nav */}
-        <nav className="border-b border-white/10 px-6 py-4 backdrop-blur-md bg-black/20">
-          <div className="max-w-5xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold tracking-tight">SpicyVPN</span>
-              <Badge className="bg-red-500/10 text-red-400 border-red-500/20 text-[10px] font-black uppercase px-2 py-0.5 ml-2">Core Admin</Badge>
+    <div className="min-h-screen bg-[#000] text-[#fafafa] font-sans antialiased">
+      {/* Sidebar-style Nav */}
+      <div className="flex flex-col md:flex-row min-h-screen">
+        <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r border-zinc-800 bg-[#09090b] flex flex-col">
+          <div className="p-6 flex items-center gap-3">
+            <div className="w-6 h-6 bg-white rounded flex items-center justify-center">
+              <div className="w-3 h-3 bg-black rounded-sm" />
             </div>
-            
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="flex items-center gap-2 text-white/70 hover:text-white">
-                  <Avatar className="w-6 h-6">
-                    <AvatarFallback className="text-[10px] bg-white/10">AD</AvatarFallback>
-                  </Avatar>
-                  <span className="text-base hidden sm:block">Administrator</span>
-                  <ChevronDown className="w-3 h-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-zinc-900 border-white/10 text-white">
-                <DropdownMenuItem
-                  className="hover:bg-white/10 cursor-pointer"
-                  onClick={() => signOut({ callbackUrl: "/" })}
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Sign out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <span className="font-bold text-sm tracking-tight uppercase">Admin Console</span>
           </div>
-        </nav>
 
-        {/* Main */}
-        <main className="relative z-10 max-w-5xl mx-auto px-6 py-12 w-full flex-1">
-          
-          <div className="mb-10 flex flex-col sm:flex-row sm:items-end justify-between gap-6">
+          <nav className="flex-1 px-4 space-y-1">
+            <button 
+              onClick={() => window.location.href = "/dashboard"}
+              className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors mb-4 border border-zinc-800/50"
+            >
+              <ArrowUpRight className="w-4 h-4" />
+              User Dashboard
+            </button>
+            <div className="h-px bg-zinc-800 my-4 mx-2" />
+            <button 
+              onClick={() => setActiveTab('overview')}
+              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'overview' ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'}`}
+            >
+              <Activity className="w-4 h-4" />
+              Overview
+            </button>
+            <button 
+              onClick={() => setActiveTab('users')}
+              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'users' ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'}`}
+            >
+              <Users className="w-4 h-4" />
+              User Registry
+            </button>
+          </nav>
+
+          <div className="p-4 mt-auto border-t border-zinc-800">
+            <div className="flex items-center gap-3 px-2 py-2">
+              <Avatar className="w-8 h-8 border border-zinc-700">
+                <AvatarFallback className="bg-zinc-900 text-xs">AD</AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold truncate text-zinc-200">Spicy Admin</p>
+                <p className="text-[10px] text-zinc-500 truncate">v0.8.4 Stable</p>
+              </div>
+              <button onClick={() => signOut({ callbackUrl: "/" })} className="text-zinc-500 hover:text-red-400">
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        {/* Main Content */}
+        <main className="flex-1 p-4 md:p-10 max-w-6xl mx-auto w-full">
+          <header className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-black mb-2 tracking-tight">System Overview</h1>
-              <p className="text-white/40 text-lg">
-                Real-time monitoring of SpicyVPN infrastructure.
-              </p>
+              <h1 className="text-2xl font-bold tracking-tight text-white">{activeTab === 'overview' ? 'System Health' : 'User Management'}</h1>
+              <p className="text-zinc-500 text-sm mt-1">{vps?.uptime || 'Updating telemetry...'}</p>
             </div>
-            <div className="flex bg-white/5 p-1 rounded-xl w-fit shrink-0 backdrop-blur-md border border-white/5">
-              <button 
-                onClick={() => setActiveTab('overview')}
-                className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'overview' ? 'bg-white text-black shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
+            <div className="flex items-center gap-3">
+              <div className="px-3 py-1 bg-zinc-900 border border-zinc-800 rounded-full flex items-center gap-2">
+                <div className={`w-1.5 h-1.5 rounded-full ${liveCount > 0 ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-zinc-700'}`} />
+                <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">{liveCount} Live Users</span>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={refreshData}
+                className="bg-transparent border-zinc-800 hover:bg-zinc-900 text-zinc-400"
               >
-                Health
-              </button>
-              <button 
-                onClick={() => setActiveTab('users')}
-                className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'users' ? 'bg-white text-black shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
-              >
-                Registry
-              </button>
+                <RefreshCw className={`w-3.5 h-3.5 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                Sync
+              </Button>
             </div>
-          </div>
-
-          {/* Live Status Row */}
-          <GlassCard className="p-8 mb-8 flex flex-col sm:flex-row items-center justify-between gap-8 border-white/5" intensity={0.08}>
-            <div className="flex items-center gap-6 text-center sm:text-left flex-col sm:flex-row">
-              <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center shrink-0 border border-emerald-500/20 shadow-xl backdrop-blur-md">
-                <Zap className="w-8 h-8 text-emerald-400" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-2xl font-bold tracking-tight text-white/90">Network Status: <span className="text-emerald-400">Operational</span></h3>
-                <p className="text-base text-white/40 leading-relaxed">
-                  Engine is currently processing {vps?.connections || 0} active tunnels across the registry.
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-4 w-full sm:w-auto">
-              <div className="flex-1 sm:flex-none bg-black/40 border border-white/5 px-6 py-3 rounded-2xl flex flex-col items-center sm:items-start min-w-[120px]">
-                <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Live Users</span>
-                <span className="text-3xl font-black text-emerald-400">{liveCount}</span>
-              </div>
-              <div className="flex-1 sm:flex-none bg-black/40 border border-white/5 px-6 py-3 rounded-2xl flex flex-col items-center sm:items-start min-w-[120px]">
-                <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Live Conn</span>
-                <span className="text-3xl font-black text-blue-400">{connectionCount}</span>
-              </div>
-            </div>
-          </GlassCard>
+          </header>
 
           {activeTab === 'overview' && (
-            <div className="grid gap-8 animate-in fade-in duration-500">
-              
-              {/* Hardware Stats Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                <GlassCard className="p-6 flex flex-col items-center justify-center text-center space-y-3 border-white/5" intensity={0.05}>
-                  <div className="text-4xl font-black tracking-tighter text-white/90 leading-none">{vps?.cpu.pct || 0}%</div>
-                  <div className="text-[10px] font-bold text-white/30 uppercase tracking-[0.2em]">CPU Load</div>
-                  <StatBar pct={vps?.cpu.pct || 0} color="bg-blue-500" />
-                </GlassCard>
-
-                <GlassCard className="p-6 flex flex-col items-center justify-center text-center space-y-3 border-white/5" intensity={0.05}>
-                  <div className="text-4xl font-black tracking-tighter text-white/90 leading-none">{vps?.ram.pct || 0}%</div>
-                  <div className="text-[10px] font-bold text-white/30 uppercase tracking-[0.2em]">Memory</div>
-                  <StatBar pct={vps?.ram.pct || 0} color="bg-purple-500" />
-                </GlassCard>
-
-                <GlassCard className="p-6 flex flex-col items-center justify-center text-center space-y-3 border-white/5" intensity={0.05}>
-                  <div className="text-4xl font-black tracking-tighter text-white/90 leading-none">{vps?.disk.pct || 0}%</div>
-                  <div className="text-[10px] font-bold text-white/30 uppercase tracking-[0.2em]">Storage</div>
-                  <StatBar pct={vps?.disk.pct || 0} color="bg-amber-500" />
-                </GlassCard>
-
-                <GlassCard className="p-6 flex flex-col items-center justify-center text-center space-y-3 border-white/5" intensity={0.05}>
-                  <div className="text-2xl font-black tracking-tighter text-white/90 leading-none truncate w-full">{vps ? fmt(vps.totalTrafficBytes).split(' ')[0] : "0"} <span className="text-lg text-white/30">{vps ? fmt(vps.totalTrafficBytes).split(' ')[1] : "GB"}</span></div>
-                  <div className="text-[10px] font-bold text-white/30 uppercase tracking-[0.2em]">Total TX</div>
-                  <div className="mt-2 text-[8px] text-emerald-500/50 font-black uppercase">Data Tunneled</div>
-                </GlassCard>
+            <div className="space-y-10 animate-in fade-in duration-500">
+              {/* Primary Stats Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  { label: 'CPU Load', value: `${vps?.cpu.pct || 0}%`, icon: Cpu, sub: `${vps?.cpu.cores} Cores` },
+                  { label: 'Memory', value: `${vps?.ram.pct || 0}%`, icon: Activity, sub: `${Math.round((vps?.ram.used || 0) / 1024 / 1024)} MB Used` },
+                  { label: 'Storage', value: `${vps?.disk.pct || 0}%`, icon: HardDrive, sub: 'Root Partition' },
+                  { label: 'Connections', value: connectionCount, icon: Database, sub: 'Active Tunnels' },
+                ].map((stat, i) => (
+                  <div key={i} className="bg-[#09090b] border border-zinc-800 p-6 rounded-lg">
+                    <div className="flex items-center justify-between mb-4">
+                      <stat.icon className="w-4 h-4 text-zinc-500" />
+                      <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">{stat.label}</span>
+                    </div>
+                    <div className="text-3xl font-bold text-white mb-1">{stat.value}</div>
+                    <div className="text-[11px] text-zinc-500 font-medium">{stat.sub}</div>
+                  </div>
+                ))}
               </div>
 
-              {/* Main Analytics Section */}
+              {/* Data and Leaderboard */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-8">
-                  <GlassCard className="p-0 border-white/5 overflow-hidden" intensity={0.08}>
-                    <div className="px-8 py-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
-                      <h3 className="text-lg font-black tracking-tight text-white/90">Top Data Consumers</h3>
-                      <Users className="w-5 h-5 text-white/20" />
-                    </div>
-                    <div className="divide-y divide-white/5">
-                      {users.sort((a, b) => b.usedTraffic - a.usedTraffic).slice(0, 5).map((u, i) => {
-                        const isLive = vps?.liveUsers?.includes(u.uuid as string);
-                        return (
-                          <div key={i} className="px-8 py-5 flex items-center justify-between hover:bg-white/[0.02] transition-colors">
-                            <div className="flex items-center gap-4">
-                              <div className="relative">
-                                <div className="w-10 h-10 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center font-black text-emerald-500">
-                                  {u.name[0].toUpperCase()}
-                                </div>
-                                {isLive && <div className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]" />}
-                              </div>
-                              <div>
-                                <p className="font-bold text-white/90">{u.name}</p>
-                                <p className="text-xs text-white/30 truncate max-w-[150px] sm:max-w-none">{u.email}</p>
-                              </div>
+                <div className="lg:col-span-2">
+                  <div className="flex items-center justify-between mb-4 px-2">
+                    <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Heaviest Consumers</h2>
+                    <ArrowUpRight className="w-4 h-4 text-zinc-600" />
+                  </div>
+                  <div className="bg-[#09090b] border border-zinc-800 rounded-lg divide-y divide-zinc-800">
+                    {users.sort((a, b) => b.usedTraffic - a.usedTraffic).slice(0, 6).map((u, i) => {
+                      const isLive = vps?.liveUsers?.includes(u.uuid as string);
+                      return (
+                        <div key={i} className="flex items-center justify-between p-4 group hover:bg-zinc-900/50 transition-colors">
+                          <div className="flex items-center gap-4 min-w-0">
+                            <div className="w-8 h-8 rounded bg-zinc-800 border border-zinc-700 flex items-center justify-center font-bold text-xs text-zinc-400">
+                              {u.name[0]}
                             </div>
-                            <div className="text-right">
-                              <p className="text-sm font-mono font-black text-emerald-400">{fmt(u.usedTraffic)}</p>
-                              <div className="w-32 h-1 bg-white/5 rounded-full mt-2">
-                                <div className="h-full bg-emerald-500/50 rounded-full" style={{ width: `${u.dataLimit > 0 ? (u.usedTraffic / u.dataLimit) * 100 : 0}%` }} />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-semibold text-zinc-200 truncate">{u.name}</p>
+                                {isLive && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
                               </div>
+                              <p className="text-[11px] text-zinc-500 truncate font-mono">{u.email}</p>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </GlassCard>
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-bold text-white">{fmt(u.usedTraffic)}</p>
+                            <div className="w-20 h-1 bg-zinc-800 rounded-full mt-1 overflow-hidden">
+                              <div className="h-full bg-zinc-400" style={{ width: `${u.dataLimit > 0 ? (u.usedTraffic / u.dataLimit) * 100 : 0}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="space-y-8">
-                  <GlassCard className="p-8 border-white/5" intensity={0.05}>
-                    <h3 className="text-sm font-black uppercase tracking-[0.2em] text-white/30 mb-8 flex items-center gap-2">
-                      <Database className="w-4 h-4" /> Statistics
-                    </h3>
-                    <div className="space-y-6">
-                      <div className="flex justify-between items-center p-5 bg-white/[0.03] rounded-2xl border border-white/5">
-                        <span className="text-xs font-bold text-white/40 uppercase">Registered</span>
-                        <span className="text-xl font-black text-white/90">{users.length}</span>
+                  <div>
+                    <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4 px-2">Traffic Totals</h2>
+                    <div className="bg-zinc-900/30 border border-zinc-800 p-6 rounded-lg space-y-6">
+                      <div>
+                        <div className="flex justify-between text-xs mb-2">
+                          <span className="text-zinc-500">Cumulative Throughput</span>
+                          <span className="text-zinc-300 font-bold">{fmt(vps?.totalTrafficBytes || 0)}</span>
+                        </div>
+                        <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-emerald-500/50" style={{ width: '65%' }} />
+                        </div>
                       </div>
-                      <div className="flex justify-between items-center p-5 bg-white/[0.03] rounded-2xl border border-white/5">
-                        <span className="text-xs font-bold text-white/40 uppercase">Active</span>
-                        <span className="text-xl font-black text-emerald-400">{vps?.activeUsers || 0}</span>
-                      </div>
-                      <div className="flex justify-between items-center p-5 bg-white/[0.03] rounded-2xl border border-white/5">
-                        <span className="text-xs font-bold text-white/40 uppercase">Slots Left</span>
-                        <span className="text-xl font-black text-amber-400">{Math.max(0, 500 - users.length)}</span>
+                      <div className="pt-4 border-t border-zinc-800 grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-[10px] text-zinc-500 uppercase font-black">Registered</p>
+                          <p className="text-lg font-bold text-white">{users.length}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-zinc-500 uppercase font-black">Active</p>
+                          <p className="text-lg font-bold text-emerald-400">{vps?.activeUsers || 0}</p>
+                        </div>
                       </div>
                     </div>
-                    <div className="mt-10 pt-8 border-t border-white/5 text-center">
-                      <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em] mb-4">Uptime</p>
-                      <div className="text-4xl font-black text-white/40 tracking-tighter italic">{vps?.uptime.split(' ').slice(0,2).join(' ') || "0d 0h"}</div>
-                    </div>
-                  </GlassCard>
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
           {activeTab === 'users' && (
-            <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-              <div className="relative group">
-                <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20 group-focus-within:text-emerald-500 transition-colors" />
+            <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-500">
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
                 <input 
                   type="text"
-                  placeholder="Search user database..."
-                  className="w-full bg-black/40 border border-white/10 rounded-2xl pl-14 pr-6 py-5 text-lg font-medium focus:border-emerald-500/50 outline-none transition-all placeholder:text-white/10 shadow-2xl backdrop-blur-xl"
+                  placeholder="Filter database by name or identifier..."
+                  className="w-full bg-[#09090b] border border-zinc-800 rounded-lg pl-11 pr-4 py-3 text-sm text-zinc-200 focus:border-zinc-600 outline-none transition-all placeholder:text-zinc-700"
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                 />
               </div>
 
-              <div className="grid gap-6">
-                {filteredUsers.map((u, i) => {
-                  const isLive = vps?.liveUsers?.includes(u.uuid as string);
-                  const usagePct = u.dataLimit > 0 ? (u.usedTraffic / u.dataLimit) * 100 : 0;
-                  return (
-                    <GlassCard key={i} className="p-6 border-white/5" intensity={0.05}>
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-                        <div className="flex items-center gap-5">
-                          <div className="relative">
-                            <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center font-black text-2xl text-emerald-500 shadow-2xl">
-                              {u.name[0].toUpperCase()}
-                            </div>
-                            {isLive && <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-4 border-black animate-pulse shadow-[0_0_15px_rgba(16,185,129,0.6)]" />}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-3">
-                              <h3 className="font-bold text-xl text-white/90">{u.name}</h3>
-                              {isLive && <Badge className="bg-emerald-500/10 text-emerald-400 border-none text-[9px] h-5 px-2 font-black uppercase tracking-widest">Live Now</Badge>}
-                            </div>
-                            <p className="text-white/30 font-medium">{u.email}</p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-8">
-                          <div className="hidden md:block w-48 space-y-2">
-                            <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-white/30">
-                              <span>Usage</span>
-                              <span>{usagePct.toFixed(1)}%</span>
-                            </div>
-                            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                              <div className={`h-full ${usagePct > 80 ? 'bg-red-500' : 'bg-emerald-500'} rounded-full transition-all duration-1000`} style={{ width: `${Math.min(100, usagePct)}%` }} />
-                            </div>
-                            <div className="flex justify-between text-[10px] font-bold text-white/20">
-                              <span>{fmt(u.usedTraffic)}</span>
-                              <span>{u.dataLimit > 0 ? fmt(u.dataLimit) : 'Unlimited'}</span>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-col items-end">
-                            <p className={`text-sm font-black ${daysLeft(u.expiresAt) < 3 ? 'text-red-400' : 'text-white/60'}`}>
-                              {u.expiresAt ? `${daysLeft(u.expiresAt)} DAYS LEFT` : 'LIFETIME ACCESS'}
-                            </p>
-                            <p className="text-[9px] text-white/20 font-black uppercase tracking-[0.2em]">Expiration</p>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            {confirmId === u.id ? (
-                              <button 
-                                onClick={() => deleteUser(u.id)}
-                                className="bg-red-500 text-black px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-400 transition-colors"
-                              >
-                                Delete?
-                              </button>
-                            ) : (
-                              <button 
-                                onClick={() => setConfirmId(u.id)}
-                                className="p-3 text-white/20 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all"
-                              >
-                                <Trash2 className="w-5 h-5" />
-                              </button>
-                            )}
-                            {confirmId === u.id && (
-                              <button onClick={() => setConfirmId(null)} className="text-[10px] font-black text-white/30 uppercase tracking-widest px-2">No</button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Mobile Usage Bar */}
-                      <div className="md:hidden mt-6 pt-6 border-t border-white/5 space-y-2">
-                        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-white/30">
-                          <span>Data Consumed</span>
-                          <span>{fmt(u.usedTraffic)} / {u.dataLimit > 0 ? fmt(u.dataLimit) : '∞'}</span>
-                        </div>
-                        <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                          <div className={`h-full ${usagePct > 80 ? 'bg-red-500' : 'bg-emerald-500'} rounded-full`} style={{ width: `${Math.min(100, usagePct)}%` }} />
-                        </div>
-                      </div>
-                    </GlassCard>
-                  );
-                })}
+              <div className="bg-[#09090b] border border-zinc-800 rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-[#111113] border-b border-zinc-800">
+                      <tr className="text-[10px] uppercase tracking-widest text-zinc-500 font-black">
+                        <th className="px-6 py-4 font-black">Identity</th>
+                        <th className="px-6 py-4 text-center font-black">Status</th>
+                        <th className="px-6 py-4 font-black">Volume</th>
+                        <th className="px-6 py-4 text-right font-black">Expiration</th>
+                        <th className="px-6 py-4 text-right pr-8 font-black">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800">
+                      {sortedUsers.map((u, i) => {
+                        const isLive = vps?.liveUsers?.includes(u.uuid as string);
+                        const usagePct = u.dataLimit > 0 ? (u.usedTraffic / u.dataLimit) * 100 : 0;
+                        return (
+                          <tr key={i} className="group hover:bg-zinc-900/30 transition-colors">
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-8 h-8 rounded border flex items-center justify-center text-xs font-bold ${isLive ? 'bg-white border-white text-black' : 'bg-zinc-900 border-zinc-800 text-zinc-500'}`}>
+                                  {u.name[0]}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-sm font-semibold text-zinc-200 truncate">{u.name}</p>
+                                  <p className="text-[11px] text-zinc-500 truncate">{u.email}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              {isLive ? (
+                                <Badge className="bg-emerald-500 text-black border-none text-[9px] font-black uppercase rounded-sm px-2">Live Now</Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-zinc-600 border-zinc-800 text-[9px] font-bold uppercase rounded-sm">Offline</Badge>
+                              )}
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="w-32 space-y-1.5">
+                                <div className="flex justify-between text-[10px] font-bold text-zinc-500">
+                                  <span>{fmt(u.usedTraffic)}</span>
+                                  <span>{u.dataLimit > 0 ? fmt(u.dataLimit).split(' ')[0] : 'Unlimited'}</span>
+                                </div>
+                                <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
+                                  <div className={`h-full ${usagePct > 80 ? 'bg-red-500' : 'bg-zinc-400'}`} style={{ width: `${Math.min(100, usagePct)}%` }} />
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <p className={`text-xs font-bold ${daysLeft(u.expiresAt) < 3 ? 'text-red-400' : 'text-zinc-400'}`}>
+                                {u.expiresAt ? `${daysLeft(u.expiresAt)} Days` : 'Lifetime'}
+                              </p>
+                            </td>
+                            <td className="px-6 py-4 text-right pr-8">
+                              <div className="flex items-center justify-end gap-2">
+                                {confirmId === u.id ? (
+                                  <div className="flex items-center gap-2">
+                                    <button onClick={() => deleteUser(u.id)} className="text-[10px] font-black text-red-400 uppercase">Confirm</button>
+                                    <button onClick={() => setConfirmId(null)} className="text-[10px] font-black text-zinc-600 uppercase">Esc</button>
+                                  </div>
+                                ) : (
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <button className="p-1 text-zinc-600 hover:text-white transition-colors">
+                                        <MoreHorizontal className="w-4 h-4" />
+                                      </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="bg-zinc-900 border-zinc-800 text-white">
+                                      <DropdownMenuItem onClick={() => setConfirmId(u.id)} className="text-red-400 focus:text-red-400 cursor-pointer">
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        Delete User
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
         </main>
-
-        <Footer />
       </div>
+      <Footer />
     </div>
   );
 }

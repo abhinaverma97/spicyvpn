@@ -1,7 +1,6 @@
 import { auth } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { NextResponse, NextRequest } from "next/server";
-import { getMarzbanUsers } from "@/lib/marzban";
 
 export const dynamic = 'force-dynamic';
 
@@ -17,45 +16,22 @@ export async function GET() {
   const dbUsers = db.prepare(`
     SELECT 
       users.id, users.name, users.email, users.image, users.createdAt,
-      vpn_configs.uuid, vpn_configs.token, vpn_configs.expiresAt, vpn_configs.active, vpn_configs.lastActive, vpn_configs.lastSyncTime
+      vpn_configs.uuid, vpn_configs.token, vpn_configs.expiresAt, vpn_configs.active, vpn_configs.lastActive, vpn_configs.lastSyncTime,
+      vpn_configs.totalUp, vpn_configs.totalDown, vpn_configs.dataLimit
     FROM users
     LEFT JOIN vpn_configs ON users.id = vpn_configs.userId AND vpn_configs.active = 1
     ORDER BY users.createdAt DESC
     LIMIT 1000
   `).all() as any[];
 
-  try {
-    const mUsers = await getMarzbanUsers();
-    const mUsersMap = new Map();
-    for (const u of mUsers) {
-      mUsersMap.set(u.username, u);
-    }
+  const users = dbUsers.map(u => ({
+    ...u,
+    usedTraffic: (u.totalUp || 0) + (u.totalDown || 0),
+    dataLimit: u.dataLimit || -1,
+    marzbanStatus: u.active ? 'active' : 'disabled'
+  }));
 
-    const enrichedUsers = dbUsers.map(u => {
-      // uuid in our DB is the Marzban username
-      const mUser = u.uuid ? mUsersMap.get(u.uuid) : null;
-      if (mUser) {
-        return {
-          ...u,
-          usedTraffic: mUser.used_traffic || 0,
-          dataLimit: mUser.data_limit || -1,
-          marzbanStatus: mUser.status,
-        };
-      }
-      return {
-        ...u,
-        usedTraffic: 0,
-        dataLimit: -1,
-        marzbanStatus: 'unknown',
-      };
-    });
-
-    return NextResponse.json(enrichedUsers);
-  } catch (error) {
-    console.error("Failed to fetch Marzban users for admin:", error);
-    // Fallback to basic DB users
-    return NextResponse.json(dbUsers.map(u => ({...u, usedTraffic: 0, dataLimit: -1, marzbanStatus: 'unknown'})));
-  }
+  return NextResponse.json(users);
 }
 
 export async function DELETE(req: NextRequest) {

@@ -93,7 +93,7 @@ export default function Dashboard({ user }: { user: User }) {
 
   function subUrl() {
     if (!config) return "";
-    return `https://spicypepper.app/api/sub?token=${config.token}`;
+    return `hy2://${config.token}@140.245.13.64:443?insecure=1&sni=www.microsoft.com#SpicyVPN-${user.name?.split(" ")[0] || "User"}`;
   }
 
   function copySubUrl() {
@@ -462,7 +462,7 @@ export default function Dashboard({ user }: { user: User }) {
                 Config expires {new Date(config.expiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
               </span>
               <Shield className="w-3.5 h-3.5 text-white/20 ml-auto" />
-              <span className="text-base text-white/20">Secured with VLESS-Reality</span>
+              <span className="text-base text-white/20">Secured with Hysteria 2</span>
             </div>
 
           </div>

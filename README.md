@@ -1,108 +1,93 @@
-# 🌶️ SpicyVPN (StealthVPN) - Core Infrastructure & Operations Manual
+# 🌶️ SpicyVPN (StealthVPN) - Hysteria 2 Infrastructure
 
-Welcome to the comprehensive documentation for **SpicyVPN**. This project has evolved from a simple tunnel into a production-grade VPN ecosystem optimized for restrictive networks (like college Wi-Fi) and high-performance gaming.
+Welcome to the comprehensive documentation for **SpicyVPN**. This project has fully migrated to the **Hysteria 2** protocol, providing peak performance on high-latency and restrictive networks.
 
 ---
 
 ## 📖 Master Table of Contents
 1. [Architecture Overview](#1-architecture-overview)
-2. [Server Stack: Marzban & Xray](#2-server-stack-marzban--xray)
-3. [Network Layer: VLESS-Reality](#3-network-layer-vless-reality)
+2. [Server Stack: Hysteria 2](#2-server-stack-hysteria-2)
+3. [Network Layer: Port 2053](#3-network-layer-port-2053)
 4. [Control Plane: Next.js Dashboard](#4-control-plane-nextjs-dashboard)
-5. [Client Ecosystem: Desktop & Hiddify](#5-client-ecosystem-desktop--hiddify)
+5. [Client Ecosystem: Hiddify](#5-client-ecosystem-hiddify)
 6. [Operational Commands](#6-operational-commands)
 
 ---
 
 ## 1. Architecture Overview
 
-SpicyVPN uses a **Stealth Proxy** architecture. Unlike traditional VPNs (OpenVPN/WireGuard) that are easily detected by Deep Packet Inspection (DPI), SpicyVPN masquerades its traffic as standard HTTPS browsing to reputable domains.
+SpicyVPN has transitioned from a proxy-based system to a high-speed **UDP-based tunneling** architecture using Hysteria 2. This allows for superior performance in gaming and real-time communication.
 
 ### Core Components:
 - **Master Node:** Oracle Ampere A1 (ARM64), 4 OCPUs, 24GB RAM.
-- **VPN Engine:** Marzban (Dockerized) running Xray-core `v24.12.31`.
+- **VPN Engine:** Standalone **Hysteria 2** (Binary) with HTTP Authentication.
 - **Web Interface:** Next.js 16 (Turbopack) for user and admin dashboards.
-- **Reverse Proxy:** Caddy handles SSL for `panel.spicypepper.app` and `spicypepper.app`.
+- **Reverse Proxy:** Caddy handles SSL for the web panel and dashboard.
 
 ---
 
-## 2. Server Stack: Marzban & Xray
+## 2. Server Stack: Hysteria 2
 
-We have standardized on **Marzban** for unified user management.
+We have decommissioned Marzban and standardized on native Hysteria 2 for its simplicity and raw speed.
 
-- **Dashboard:** `https://panel.spicypepper.app/`
-- **Xray Core:** Locked to `v24.12.31` for maximum stability with Python config parsing.
-- **User Database:** `/var/lib/marzban/db.sqlite3`.
-- **Inbound Configuration:** `/var/lib/marzban/xray_config.json`.
+- **Main Config:** `/etc/hysteria/main.yaml`
+- **Authentication:** Integrated via Next.js API (`/api/h2/auth`).
+- **Stats Tracking:** Handled via local HTTP stats endpoint on port 9999.
 - **Key Features:**
-  - Automated 35GB/30-day data caps.
-  - Real-time traffic accounting.
-  - Unified subscription API (`/sub/`).
+  - Standardized 35GB/30-day data caps enforced at the gateway.
+  - Real-time user authentication directly against the SQLite database.
+  - Brutal congestion control optimized for restricted Wi-Fi.
 
 ---
 
-## 3. Network Layer: VLESS-Reality
+## 3. Network Layer: Port 2053
 
-The primary protocol used is **VLESS** with **Reality** security and **XTLS-Vision** flow.
+The primary production gateway is now listening on **Port 2053**.
 
-### Stealth Mechanics:
-- **SNI Masquerading:** All traffic poses as a connection to `www.microsoft.com`.
-- **Reality Security:** Eliminates the need for traditional TLS certificates by using a pre-shared public key and short-id, making active probing by firewalls impossible.
-- **Flow control:** `xtls-rprx-vision` dynamically shapes packet timing to match real browser behavior.
-
-### Gaming Optimizations:
-- **Full-Cone NAT:** Enabled on the server to support peer-to-peer gaming and Discord voice chat.
-- **XUDP (Tunable):** Standardized UDP-in-TCP tunneling for reliable performance on restrictive Wi-Fi.
-- **MTU:** Fixed at `1350` to prevent fragmentation on international links.
+### Why 2053?
+- **Obfuscation:** Commonly used for cloud management, making it less likely to be blocked than standard VPN ports.
+- **UDP Performance:** Hysteria 2 leverages the full power of UDP to eliminate Head-of-Line blocking.
+- **Auto-Update:** Clients automatically refresh their configuration every 1 hour via the `Profile-Update-Interval` header.
 
 ---
 
 ## 4. Control Plane: Next.js Dashboard
 
-The frontend acts as the bridge between the user and the Marzban backend.
+The frontend serves as the centralized management console.
 
 ### User Dashboard:
-- **Identity:** Google OAuth 2.0 via Auth.js.
-- **Subscription:** Generates a private proxy link that automatically imports into Hiddify.
-- **Usage Tracking:** Real-time sync with Marzban to show days remaining and data left.
+- **Subscription:** Generates **`hy2://`** links compatible with Hiddify.
+- **Usage:** Displays real-time data remaining and expiration dates.
 
 ### Admin Dashboard (`/admin`):
-- **Registry:** Full user list with live activity indicators (pulsing green dot).
-- **Health:** Real-time hardware telemetry (CPU, RAM, Disk, Total Tunneled Data).
-- **Style:** Matched to the main site's "Elite Stealth" aesthetic.
+- **Minimalist Design:** Professional, high-density dashboard for fleet oversight.
+- **Live Monitoring:** Real-time tracking of active connections and total network throughput.
+- **User Management:** Full CRUD operations for access keys.
 
 ---
 
 ## 5. Client Ecosystem
 
-### Desktop Client (SpicyVPN Desktop)
-- **Tech Stack:** Tauri v2 + React + Rust.
-- **Engine:** Integrated `sing-box` sidecar.
-- **Performance:** Native TUN interface, GVisor stack for non-admin compatibility.
-- **Features:** Real-time log viewer, auto-update, and 1-click connect.
-
-### Mobile / Alternative
-- **Hiddify:** Official recommendation for Windows, Android, and iOS.
+### Official Recommendation: Hiddify
+- **Platforms:** Windows, Android, iOS, macOS.
 - **Config:** Import via subscription link (`api/sub?token=...`).
+- **Mode:** For best results, use **VPN Mode** (Admin required on Windows).
 
 ---
 
 ## 6. Operational Commands
 
 ### Process Management
+- **Hysteria Main:** `sudo systemctl restart hysteria-main`
+- **Hysteria Test:** `sudo systemctl restart hysteria2`
 - **Next.js App:** `sudo systemctl restart stealthvpn`
-- **Logs:** `sudo journalctl -u stealthvpn -f`
-- **Marzban Engine:** 
-  ```bash
-  cd /opt/marzban && sudo docker compose restart
-  ```
+- **Check Logs:** `sudo journalctl -u hysteria-main -f`
 
 ### Directory Map
+- `/etc/hysteria`: Server configuration and SSL keys.
 - `/home/ubuntu/.openclaw/workspace/stealthvpn`: Web source code.
-- `/opt/marzban`: Marzban deployment files.
-- `/var/lib/marzban`: Xray configs and user databases.
-- `/etc/caddy/Caddyfile`: Reverse proxy rules.
+- `/var/lib/marzban`: Legacy data (Read-only).
 
 ---
 
-**🌶️ Stay Spicy. Stay Stealth.**
+**🌶️ Stay Spicy. Stay Fast.**

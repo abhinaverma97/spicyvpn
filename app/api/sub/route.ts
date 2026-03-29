@@ -35,7 +35,7 @@ export async function GET(req: Request) {
     // Return the Hysteria 2 connection link directly as the subscription content
     // We base64 encode it as that is standard for subscription lists
     const userName = config.name ? config.name.split(" ")[0] : "User";
-    const hy2Link = `hy2://${config.token}@140.245.13.64:443?insecure=1&sni=www.microsoft.com#SpicyVPN-${userName}`;
+    const hy2Link = `hy2://${config.token}@140.245.13.64:2053?insecure=1&sni=www.microsoft.com#SpicyVPN-${userName}`;
     const base64Data = Buffer.from(hy2Link).toString('base64');
 
     return new Response(base64Data, {

@@ -1,8 +1,8 @@
 import { auth } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { generateUUID, getExpiryDate } from "@/lib/vpn";
 import { NextResponse } from "next/server";
 import { randomUUID, randomBytes } from "crypto";
+import { getMarzbanUser, createMarzbanUser, sanitizeUsername } from "@/lib/marzban";
 
 function generateToken(): string {
   return "spx_" + randomBytes(8).toString("hex");
@@ -17,8 +17,8 @@ export async function POST() {
 
     const db = getDb();
     const now = Math.floor(Date.now() / 1000);
+    const mUsername = sanitizeUsername(session.user.email);
 
-    // Check existing active config
     const existing = db.prepare(`
       SELECT * FROM vpn_configs
       WHERE userId = ? AND active = 1 AND expiresAt > ?
@@ -26,32 +26,32 @@ export async function POST() {
     `).get(session.user.id, now) as any;
 
     if (existing) {
-      const usedTraffic = (existing.totalUp || 0) + (existing.totalDown || 0);
-
-      const { deviceCount } = db.prepare(
-        "SELECT COUNT(*) as deviceCount FROM token_devices WHERE token = ?"
-      ).get(existing.token) as { deviceCount: number };
-
-      return NextResponse.json(toConfig(existing, usedTraffic, -1, deviceCount));
+      const mUser = await getMarzbanUser(existing.uuid);
+      if (mUser) {
+         const { deviceCount } = db.prepare(
+           "SELECT COUNT(*) as deviceCount FROM token_devices WHERE token = ?"
+         ).get(existing.token) as { deviceCount: number };
+   
+         return NextResponse.json(toConfig(existing, mUser.used_traffic || 0, mUser.data_limit || -1, deviceCount));
+      }
     }
 
-    // Generate new config
-    const uuid = generateUUID(); 
-    const expiresAt = Math.floor(getExpiryDate().getTime() / 1000);
+    let mUser = await getMarzbanUser(mUsername);
+    if (!mUser) {
+      mUser = await createMarzbanUser(mUsername);
+    }
+
     const id = randomUUID();
     const token = generateToken();
 
     db.prepare(`
       INSERT INTO vpn_configs (id, userId, uuid, token, expiresAt)
       VALUES (?, ?, ?, ?, ?)
-    `).run(id, session.user.id, uuid, token, expiresAt);
+    `).run(id, session.user.id, mUsername, token, mUser.expire);
 
     const config = db.prepare("SELECT * FROM vpn_configs WHERE id = ?").get(id) as any;
 
-    // Hysteria now handles auth via OUR HTTP hook (api/h2/auth)
-    // No need to call external H-UI database anymore.
-
-    return NextResponse.json(toConfig(config, 0, -1, 0));
+    return NextResponse.json(toConfig(config, mUser.used_traffic || 0, mUser.data_limit || -1, 0));
   } catch (error: any) {
     console.error("VPN POST Error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -71,10 +71,15 @@ export async function GET() {
     `).all(session.user.id) as any[];
 
     let usedTraffic = 0;
+    let dataLimit = -1;
     let deviceCount = 0;
     
     if (configs.length > 0) {
-      usedTraffic = (configs[0].totalUp || 0) + (configs[0].totalDown || 0);
+      const mUser = await getMarzbanUser(configs[0].uuid);
+      if (mUser) {
+        usedTraffic = mUser.used_traffic || 0;
+        dataLimit = mUser.data_limit || -1;
+      }
 
       const deviceRow = db.prepare(
         "SELECT COUNT(*) as count FROM token_devices WHERE token = ?"
@@ -82,7 +87,7 @@ export async function GET() {
       deviceCount = deviceRow.count;
     }
 
-    return NextResponse.json(configs.map(row => toConfig(row, usedTraffic, -1, deviceCount)));
+    return NextResponse.json(configs.map(row => toConfig(row, usedTraffic, dataLimit, deviceCount)));
   } catch (error: any) {
     console.error("VPN GET Error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

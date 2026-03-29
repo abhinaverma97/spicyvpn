@@ -4,6 +4,7 @@ import { getDb } from "@/lib/db";
 import os from "os";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { getMarzbanUsers } from "@/lib/marzban";
 
 const execAsync = promisify(exec);
 
@@ -45,50 +46,58 @@ export async function GET() {
   const totalConfigs = db.prepare("SELECT COUNT(*) as count FROM vpn_configs").get() as any;
   const activeConfigs = db.prepare("SELECT COUNT(*) as count FROM vpn_configs WHERE active = 1").get() as any;
 
-  // 2. Fetch User Stats and Live Connections from DB
-  const now = Math.floor(Date.now() / 1000);
-  // Increase threshold to 90s to account for potential node-hub latency
-  const ACTIVE_THRESHOLD = now - 90; 
+  // 2. Threshold for live check
+  const now = new Date();
+  const LIVE_THRESHOLD_MS = 120 * 1000; // 2 minutes
 
-  // Efficiently get sums and active counts via SQL instead of looping in memory
-  const globalTraffic = db.prepare(`
-    SELECT 
-      SUM(totalUp) as up, 
-      SUM(totalDown) as down,
-      (SELECT COUNT(*) FROM vpn_configs 
-       WHERE lastActive >= ? 
-       AND (nodeId IS NOT NULL)) as live_count
-    FROM vpn_configs
-  `).get(ACTIVE_THRESHOLD) as { up: number, down: number, live_count: number };
-
-  const totalUp = globalTraffic.up || 0;
-  const totalDown = globalTraffic.down || 0;
-  const totalTraffic = totalUp + totalDown;
-  const liveConnections = globalTraffic.live_count;
-
-  // We still need the userTraffic map for the user table in the dashboard
-  const userTrafficRecords = db.prepare("SELECT uuid, totalUp, totalDown, lastActive FROM vpn_configs").all() as any[];
-  const userTraffic: Record<string, { up: number; down: number; lastActive: number }> = {};
+  let totalUp = 0;
+  let totalDown = 0;
+  let totalTraffic = 0;
+  let liveConnections = 0;
   const liveUsers: string[] = [];
+  const userTraffic: Record<string, { up: number; down: number; lastActive: number }> = {};
 
-  for (const record of userTrafficRecords) {
-    userTraffic[record.uuid] = { 
-      up: record.totalUp || 0, 
-      down: record.totalDown || 0, 
-      lastActive: record.lastActive 
-    };
-    if (record.lastActive >= ACTIVE_THRESHOLD) {
-      liveUsers.push(record.uuid);
+  // --- Fetch from Marzban (Source of Truth) ---
+  try {
+    const mUsers = await getMarzbanUsers();
+
+    let mTotalUsed = 0;
+    for (const u of mUsers) {
+      mTotalUsed += u.used_traffic || 0;
+      userTraffic[u.username] = { 
+        up: u.used_traffic || 0, 
+        down: 0, 
+        lastActive: u.online_at ? new Date(u.online_at).getTime() / 1000 : 0 
+      };
+      
+      // Calculate live users based on online_at
+      if (u.online_at) {
+        const onlineAt = new Date(u.online_at);
+        if (now.getTime() - onlineAt.getTime() < LIVE_THRESHOLD_MS) {
+          liveUsers.push(u.username);
+          liveConnections++;
+        }
+      }
     }
-  }
+    
+    totalUp = mTotalUsed;
+    totalDown = 0;
+    totalTraffic = mTotalUsed;
 
-  // 3. Node-specific load stats
-  const nodeStats = db.prepare(`
-    SELECT SUM(currentLoad) as total_node_load FROM nodes WHERE status = 'active'
-  `).get() as { total_node_load: number };
-  
-  // Use node-reported load as the primary metric if available
-  const reportConnections = Math.max(liveConnections, nodeStats.total_node_load || 0);
+  } catch (err) {
+    console.error("Failed to fetch Marzban stats:", err);
+    // Fallback to local DB if Marzban fails
+    const ACTIVE_THRESHOLD = Math.floor(Date.now() / 1000) - 90;
+    const globalTraffic = db.prepare(`
+      SELECT SUM(totalUp) as up, SUM(totalDown) as down,
+      (SELECT COUNT(*) FROM vpn_configs WHERE lastActive >= ?) as live_count
+      FROM vpn_configs
+    `).get(ACTIVE_THRESHOLD) as any;
+    totalUp = globalTraffic.up || 0;
+    totalDown = globalTraffic.down || 0;
+    totalTraffic = totalUp + totalDown;
+    liveConnections = globalTraffic.live_count;
+  }
 
   // 3. System Stats
   const cpus = os.cpus();
@@ -112,7 +121,7 @@ export async function GET() {
     disk: diskStats,
     uptime: getUptime(),
     network: { rx: totalDown, tx: totalUp }, 
-    connections: reportConnections,
+    connections: liveConnections,
     liveUsers: liveUsers, 
     hysteriaStatus: "active",
     userTraffic,

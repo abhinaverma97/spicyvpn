@@ -40,7 +40,6 @@ export default async function AdminPage() {
   return (
     <AdminDashboard
       stats={{ totalUsers, activeConfigs, expiredConfigs, totalConfigs, capacity: 500 }}
-      nodes={nodes as any[]}
       users={users.map(u => ({
         id: u.id as string,
         email: u.email as string,
@@ -52,6 +51,9 @@ export default async function AdminPage() {
         active: Boolean(u.active),
         deviceCount: 0,
         lastActive: Number(u.lastActive || 0),
+        usedTraffic: 0,
+        dataLimit: -1,
+        marzbanStatus: 'unknown',
       }))}
 
     />

@@ -163,7 +163,7 @@ export default function Dashboard({ user }: { user: User }) {
       </nav>
 
       {/* Main */}
-      <main className="max-w-5xl mx-auto px-6 py-12">
+      <main className="relative z-10 max-w-5xl mx-auto px-6 py-12">
 
 
         <div className="mb-10">
@@ -334,7 +334,7 @@ export default function Dashboard({ user }: { user: User }) {
                     </div>
                     <span className="text-lg font-bold text-white/80">Windows</span>
                     <a
-                      href="https://github.com/hiddify/hiddify-app/releases/latest/download/Hiddify-Windows-Setup-x64.exe"
+                      href="https://github.com/hiddify/hiddify-app/releases/download/v4.1.1/Hiddify-Windows-Setup-x64.exe"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="ml-auto text-sm font-bold px-4 py-2 rounded-xl border border-white/10 text-white/50 hover:border-white/30 hover:text-white transition-all bg-white/5"
@@ -343,8 +343,8 @@ export default function Dashboard({ user }: { user: User }) {
                     </a>
                   </div>
                   <ol className="space-y-2 text-base text-white/30 ml-4 border-l border-white/5 pl-6">
-                    <li>1. Download and install <span className="text-white/60 font-medium">Hiddify</span> for Windows</li>
-                    <li>2. Copy your subscription link</li>
+                    <li>1. Install <span className="text-white/60 font-medium">Hiddify</span> for Windows</li>
+                    <li>2. Copy your link from the box above</li>
                     <li>3. Open Hiddify → click <span className="text-white/60 font-medium">+</span> → <span className="text-white/60 font-medium">Add from clipboard</span></li>
                     <li>4. Click <span className="text-white/60 font-medium">Connect</span></li>
                   </ol>
@@ -462,7 +462,7 @@ export default function Dashboard({ user }: { user: User }) {
                 Config expires {new Date(config.expiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
               </span>
               <Shield className="w-3.5 h-3.5 text-white/20 ml-auto" />
-              <span className="text-base text-white/20">Secured with Hysteria 2</span>
+              <span className="text-base text-white/20">Secured with VLESS-Reality</span>
             </div>
 
           </div>

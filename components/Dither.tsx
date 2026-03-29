@@ -175,7 +175,7 @@ export default function Dither({ speed = 0.05 }: { speed?: number }) {
   return (
     <canvas
       ref={canvasRef}
-      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block" }}
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block", pointerEvents: "none", zIndex: 0 }}
     />
   );
 }

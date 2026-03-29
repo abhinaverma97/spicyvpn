@@ -1,82 +1,92 @@
 import { getDb } from "@/lib/db";
-import { generateHysteriaLink } from "@/lib/vpn";
-import { NextRequest, NextResponse } from "next/server";
+import { getMarzbanUser, createMarzbanUser, sanitizeUsername } from "@/lib/marzban";
 
-export async function GET(req: NextRequest) {
-  const token = req.nextUrl.searchParams.get("token");
-  if (!token) return new NextResponse("Token required", { status: 400 });
-
-  const db = getDb();
-  const now = Math.floor(Date.now() / 1000);
-
-  const config = db.prepare(`
-    SELECT vpn_configs.*, users.email 
-    FROM vpn_configs
-    JOIN users ON users.id = vpn_configs.userId
-    WHERE token = ? AND active = 1 AND expiresAt > ?
-  `).get(token, now) as any;
-
-  if (!config) return new NextResponse("Invalid or expired token", { status: 404 });
-
-  // Track device connection
+export async function GET(req: Request) {
   try {
-    const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || 
-               req.headers.get("x-real-ip") || 
-               "unknown";
+    const { searchParams } = new URL(req.url);
+    const token = searchParams.get("token");
+
+    if (!token) {
+      return new Response("Missing token", { status: 400 });
+    }
+
+    const db = getDb();
     
-    const knownDevice = db.prepare(
-      "SELECT 1 FROM token_devices WHERE token = ? AND ip = ?"
-    ).get(token, ip);
+    // Join with users table to get the email for migration if needed
+    const config = db.prepare(`
+      SELECT vc.*, u.email 
+      FROM vpn_configs vc
+      JOIN users u ON vc.userId = u.id
+      WHERE vc.token = ? AND vc.active = 1
+    `).get(token) as any;
 
-    if (!knownDevice) {
-      db.prepare(
-        "INSERT INTO token_devices (token, ip) VALUES (?, ?)"
-      ).run(token, ip);
-    } else {
-      db.prepare(
-        "UPDATE token_devices SET lastSeen = (unixepoch()) WHERE token = ? AND ip = ?"
-      ).run(token, ip);
+    if (!config) {
+      return new Response("Invalid or expired token", { status: 404 });
     }
-  } catch (e) {
-    console.error("Device tracking failed:", e);
-  }
 
-  // Node Load Balancer Logic
-  let payload = "";
-  try {
-    // Get the node with the lowest currentLoad that is still active
-    const bestNode = db.prepare(`
-      SELECT ip, name 
-      FROM nodes 
-      WHERE status = 'active' 
-      AND ((? - lastHeartbeat) < 300 OR lastHeartbeat = 0)
-      ORDER BY currentLoad ASC
-      LIMIT 1
-    `).get(now) as { ip: string, name: string } | undefined;
-
-    if (bestNode) {
-      payload = generateHysteriaLink(config.uuid, bestNode.ip, bestNode.name);
-    } else {
-      // Fallback to Master IP if no nodes are found in DB
-      payload = generateHysteriaLink(config.uuid);
+    const now = Math.floor(Date.now() / 1000);
+    if (config.expiresAt < now) {
+      return new Response("Subscription expired", { status: 403 });
     }
-  } catch (e) {
-    console.error("Load balancer failed:", e);
-    payload = generateHysteriaLink(config.uuid);
+
+    // Log device activity
+    const clientIp = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
+    db.prepare(`INSERT OR IGNORE INTO token_devices (token, ip, lastSeen) VALUES (?, ?, ?)`).run(token, clientIp, now);
+    db.prepare(`UPDATE token_devices SET lastSeen = ? WHERE token = ? AND ip = ?`).run(now, token, clientIp);
+
+    // 1. Try to fetch the user from Marzban using the stored 'uuid'
+    let mUser = await getMarzbanUser(config.uuid);
+
+    // 2. Auto-migrate legacy users to Marzban
+    if (!mUser && config.email) {
+      const mUsername = sanitizeUsername(config.email);
+      mUser = await getMarzbanUser(mUsername);
+      if (!mUser) mUser = await createMarzbanUser(mUsername);
+
+      if (mUser) {
+        db.prepare(`UPDATE vpn_configs SET uuid = ? WHERE id = ?`).run(mUsername, config.id);
+        console.log(`Auto-migrated user ${config.email} to Marzban username: ${mUsername}`);
+      }
+    }
+
+    if (!mUser || mUser.status === 'disabled') {
+       return new Response("User disabled or not found in Marzban", { status: 403 });
+    }
+
+    // Proxy the standard subscription content directly from Marzban
+    if (mUser.subscription_url) {
+      let internalSubUrl = mUser.subscription_url;
+      
+      if (internalSubUrl.startsWith('/')) {
+        internalSubUrl = `http://127.0.0.1:8001${internalSubUrl}`;
+      } else {
+        try {
+          const urlObj = new URL(internalSubUrl);
+          internalSubUrl = `http://127.0.0.1:8001${urlObj.pathname}${urlObj.search}`;
+        } catch (e) {
+          console.error("Malformed subscription URL from Marzban:", mUser.subscription_url);
+        }
+      }
+
+      const userAgent = req.headers.get('user-agent') || 'SpicyVPN Client';
+      const subRes = await fetch(internalSubUrl, { headers: { 'User-Agent': userAgent } });
+      
+      if (subRes.ok) {
+        const subData = await subRes.text();
+        return new Response(subData, {
+          headers: {
+            "Content-Type": subRes.headers.get("Content-Type") || "text/plain; charset=utf-8",
+            "Subscription-Userinfo": `upload=${mUser.used_traffic}; download=0; total=${mUser.data_limit}; expire=${mUser.expire}`,
+            "Profile-Update-Interval": "1"
+          }
+        });
+      }
+    }
+
+    return new Response("Failed to fetch upstream subscription", { status: 500 });
+
+  } catch (error) {
+    console.error("Sub route error:", error);
+    return new Response("Internal Server Error", { status: 500 });
   }
-
-  const finalBody = Buffer.from(payload).toString("base64");
-
-  const up = config.totalUp || 0;
-  const down = config.totalDown || 0;
-  const totalLimit = 35 * 1024 * 1024 * 1024; // 35GB limit
-
-  return new NextResponse(finalBody, {
-    headers: {
-      "Content-Type": "text/plain; charset=utf-8",
-      "Profile-Title": "SpicyVPN",
-      "Profile-Update-Interval": "1",
-      "Subscription-Userinfo": `upload=${up}; download=${down}; total=${totalLimit}; expire=${config.expiresAt}`,
-    },
-  });
 }

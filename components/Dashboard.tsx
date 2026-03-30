@@ -335,26 +335,18 @@ export default function Dashboard({ user }: { user: User }) {
                     <span className="text-lg font-bold text-white/80">Windows</span>
                     <div className="ml-auto flex gap-2">
                       <a
-                        href="https://github.com/abhinaverma97/spicyvpn-desktop/releases/latest"
+                        href="https://github.com/spicyvpn365/spicyvpn/releases/download/win/SpicyVPN_0.1.0_x64-setup.exe"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-sm font-bold px-4 py-2 rounded-xl border border-emerald-500/20 text-emerald-400 hover:border-emerald-500/40 hover:text-emerald-300 transition-all bg-emerald-500/5"
                       >
-                        Spicy App
-                      </a>
-                      <a
-                        href="https://github.com/hiddify/hiddify-app/releases/latest"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm font-bold px-4 py-2 rounded-xl border border-white/10 text-white/50 hover:border-white/30 hover:text-white transition-all bg-white/5"
-                      >
-                        Hiddify
+                        Download SpicyVPN
                       </a>
                     </div>
                   </div>
                   <ol className="space-y-2 text-base text-white/30 ml-4 border-l border-white/5 pl-6">
                     <li>1. Install <span className="text-white/60 font-medium">SpicyVPN Desktop</span></li>
-                    <li>2. Copy your link from the box above</li>
+                    <li>2. Copy your subscription link from the box above</li>
                     <li>3. Paste into the app and click <span className="text-white/60 font-medium">Save Gateway</span></li>
                     <li>4. Click <span className="text-white/60 font-medium">Connect</span></li>
                   </ol>

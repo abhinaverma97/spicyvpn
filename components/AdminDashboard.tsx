@@ -127,17 +127,21 @@ export default function AdminDashboard({ users: initialUsers }: { users: User[] 
   );
 
   const liveUsersCount = users.filter(u => vps?.liveUsers?.includes(u.uuid as string)).length;
-  const newUsersCount = users.filter(u => Date.now() - new Date(u.joinedAt).getTime() < 7 * 24 * 60 * 60 * 1000).length;
   const activeSubsCount = users.filter(u => u.active && u.expiresAt && (typeof u.expiresAt === 'number' ? u.expiresAt * 1000 : new Date(u.expiresAt).getTime()) > Date.now()).length;
 
   const filteredUsers = searchedUsers.filter(u => {
     if (filterType === "live") return vps?.liveUsers?.includes(u.uuid as string);
-    if (filterType === "new") return Date.now() - new Date(u.joinedAt).getTime() < 7 * 24 * 60 * 60 * 1000;
     if (filterType === "active") return u.active && u.expiresAt && (typeof u.expiresAt === 'number' ? u.expiresAt * 1000 : new Date(u.expiresAt).getTime()) > Date.now();
-    return true;
+    return true; // 'new' and 'all' show everyone
   });
 
   const sortedUsers = [...filteredUsers].sort((a, b) => {
+    // If 'new' is selected, override default sorting to sort by join date
+    if (filterType === "new") {
+      return new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime();
+    }
+    
+    // Default sorting: Live first, then by highest data usage
     const aLive = vps?.liveUsers?.includes(a.uuid as string) ? 1 : 0;
     const bLive = vps?.liveUsers?.includes(b.uuid as string) ? 1 : 0;
     if (aLive !== bLive) return bLive - aLive;
@@ -268,7 +272,7 @@ export default function AdminDashboard({ users: initialUsers }: { users: User[] 
                   <option value="all">All ({searchedUsers.length})</option>
                   <option value="live">Live Now ({liveUsersCount})</option>
                   <option value="active">Active Subs ({activeSubsCount})</option>
-                  <option value="new">Newest ({newUsersCount})</option>
+                  <option value="new">Sort by Newest</option>
                 </select>
                 <div className="relative w-full sm:max-w-xs">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />

@@ -291,11 +291,11 @@ export default function AdminDashboard({ users: initialUsers }: { users: User[] 
               <table className="w-full text-left border-collapse min-w-[900px]">
                 <thead className="bg-white/5 border-b border-white/5">
                   <tr className="text-[10px] uppercase tracking-widest text-white/30 font-bold">
-                    <th className="px-8 py-5">Identity</th>
-                    <th className="px-8 py-5 text-center">Status</th>
-                    <th className="px-8 py-5">Data Consumed</th>
-                    <th className="px-8 py-5 text-right">Validity</th>
-                    <th className="px-8 py-5 text-right pr-10">Manage</th>
+                    <th className="px-6 py-3">Identity</th>
+                    <th className="px-6 py-3 text-center">Status</th>
+                    <th className="px-6 py-3">Data Consumed</th>
+                    <th className="px-6 py-3 text-right">Validity</th>
+                    <th className="px-6 py-3 text-right pr-6">Manage</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -306,30 +306,30 @@ export default function AdminDashboard({ users: initialUsers }: { users: User[] 
                     
                     return (
                       <tr key={i} className={`group transition-all duration-300 ${isLive ? 'bg-emerald-500/[0.02]' : 'hover:bg-white/[0.02]'}`}>
-                        <td className="px-8 py-6">
-                          <div className="flex items-center gap-4">
-                            <div className={`w-10 h-10 rounded-xl border flex items-center justify-center font-bold text-sm shrink-0 transition-all duration-500 ${isLive ? 'bg-white border-white text-black scale-105 shadow-[0_0_15px_rgba(255,255,255,0.2)]' : 'bg-white/5 border-white/5 text-white/30'}`}>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-lg border flex items-center justify-center font-bold text-sm shrink-0 transition-all duration-500 ${isLive ? 'bg-white border-white text-black scale-105 shadow-[0_0_15px_rgba(255,255,255,0.2)]' : 'bg-white/5 border-white/5 text-white/30'}`}>
                               {u.name[0]}
                             </div>
                             <div className="min-w-0">
                               <p className="text-sm font-bold text-white/90 truncate">{u.name}</p>
-                              <p className="text-[11px] text-white/20 truncate font-mono">{u.email}</p>
+                              <p className="text-[10px] text-white/30 truncate font-mono">{u.email}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="px-8 py-6 text-center">
+                        <td className="px-6 py-4 text-center">
                           {isLive ? (
-                            <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[9px] font-bold uppercase tracking-widest px-3 py-1 rounded-full">
+                            <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full">
                               Live Now
                             </Badge>
                           ) : (
-                            <Badge className="bg-transparent text-white/20 border-white/5 text-[9px] font-bold uppercase tracking-widest px-3 py-1 rounded-full">
+                            <Badge className="bg-transparent text-white/20 border-white/5 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full">
                               Offline
                             </Badge>
                           )}
                         </td>
-                        <td className="px-8 py-6">
-                          <div className="w-48 space-y-2">
+                        <td className="px-6 py-4">
+                          <div className="w-40 space-y-1.5">
                             <div className="flex justify-between text-[10px] font-bold">
                               <span className={isLive ? "text-emerald-400" : "text-white/40"}>{fmt(u.usedTraffic)}</span>
                               <span className="text-white/10 uppercase tracking-tighter italic">Cap 35 GB</span>
@@ -342,23 +342,23 @@ export default function AdminDashboard({ users: initialUsers }: { users: User[] 
                             </div>
                           </div>
                         </td>
-                        <td className="px-8 py-6 text-right">
+                        <td className="px-6 py-4 text-right">
                           <div className="inline-flex flex-col items-end">
                             <p className={`text-xs font-bold ${daysLeft(u.expiresAt) !== -1 && daysLeft(u.expiresAt) < 3 ? 'text-red-400' : 'text-white/70'}`}>
                               {daysLeft(u.expiresAt) === -1 ? 'NO PLAN' : `${daysLeft(u.expiresAt)} DAYS`}
                             </p>
-                            <p className="text-[9px] text-white/10 font-bold uppercase tracking-widest mt-0.5">Remaining</p>
+                            <p className="text-[9px] text-white/20 font-bold uppercase tracking-widest mt-0.5">Remaining</p>
                           </div>
                         </td>
-                        <td className="px-8 py-6 text-right pr-10">
+                        <td className="px-6 py-4 text-right pr-6">
                           <div className="flex items-center justify-end">
                             {confirmId === u.id ? (
                               <div className="flex items-center gap-2 animate-in zoom-in-95">
-                                <button onClick={() => deleteUser(u.id)} className="text-[10px] font-bold text-red-400 bg-red-400/10 px-3 py-1.5 rounded-lg border border-red-400/20 hover:bg-red-400/20 transition-all uppercase tracking-widest">Revoke</button>
-                                <button onClick={() => setConfirmId(null)} className="text-[10px] font-bold text-white/30 uppercase px-2">Esc</button>
+                                <button onClick={() => deleteUser(u.id)} className="text-[9px] font-bold text-red-400 bg-red-400/10 px-2 py-1 rounded-lg border border-red-400/20 hover:bg-red-400/20 transition-all uppercase tracking-widest">Revoke</button>
+                                <button onClick={() => setConfirmId(null)} className="text-[9px] font-bold text-white/30 uppercase px-2">Esc</button>
                               </div>
                             ) : (
-                              <button onClick={() => setConfirmId(u.id)} className="p-2.5 text-white/10 hover:text-red-400 hover:bg-white/5 rounded-xl transition-all">
+                              <button onClick={() => setConfirmId(u.id)} className="p-2 text-white/20 hover:text-red-400 hover:bg-white/5 rounded-lg transition-all">
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             )}

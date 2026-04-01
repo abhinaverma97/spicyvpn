@@ -74,6 +74,7 @@ export default function AdminDashboard({ users: initialUsers }: { users: User[] 
   const [vps, setVps] = useState<VpsStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [filterType, setFilterType] = useState<"all" | "live" | "new" | "active">("all");
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
   async function refreshData() {
@@ -111,18 +112,30 @@ export default function AdminDashboard({ users: initialUsers }: { users: User[] 
 
   function daysLeft(expiresAt: any) {
     if (!expiresAt) return -1;
-    const expiry = new Date(expiresAt).getTime();
-    const diff = expiry - Date.now();
+    // If it's a number, assume it's Unix seconds and convert to ms
+    const expiryMs = typeof expiresAt === 'number' ? expiresAt * 1000 : new Date(expiresAt).getTime();
+    const diff = expiryMs - Date.now();
     return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
   }
 
   if (!mounted) return null;
 
-  const filteredUsers = users.filter(u => 
+  const searchedUsers = users.filter(u => 
     u.email.toLowerCase().includes(search.toLowerCase()) || 
     u.name.toLowerCase().includes(search.toLowerCase()) ||
     u.uuid?.toLowerCase().includes(search.toLowerCase())
   );
+
+  const liveUsersCount = users.filter(u => vps?.liveUsers?.includes(u.uuid as string)).length;
+  const newUsersCount = users.filter(u => Date.now() - new Date(u.joinedAt).getTime() < 7 * 24 * 60 * 60 * 1000).length;
+  const activeSubsCount = users.filter(u => u.active && u.expiresAt && (typeof u.expiresAt === 'number' ? u.expiresAt * 1000 : new Date(u.expiresAt).getTime()) > Date.now()).length;
+
+  const filteredUsers = searchedUsers.filter(u => {
+    if (filterType === "live") return vps?.liveUsers?.includes(u.uuid as string);
+    if (filterType === "new") return Date.now() - new Date(u.joinedAt).getTime() < 7 * 24 * 60 * 60 * 1000;
+    if (filterType === "active") return u.active && u.expiresAt && (typeof u.expiresAt === 'number' ? u.expiresAt * 1000 : new Date(u.expiresAt).getTime()) > Date.now();
+    return true;
+  });
 
   const sortedUsers = [...filteredUsers].sort((a, b) => {
     const aLive = vps?.liveUsers?.includes(a.uuid as string) ? 1 : 0;
@@ -246,15 +259,27 @@ export default function AdminDashboard({ users: initialUsers }: { users: User[] 
               <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
                 <Users className="w-5 h-5 text-white/30" /> Identity Registry
               </h2>
-              <div className="relative w-full max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-                <input 
-                  type="text"
-                  placeholder="Filter users..."
-                  className="w-full bg-black/40 border border-white/5 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white/70 focus:border-white/20 outline-none transition-all placeholder:text-white/10"
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                />
+              <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                <select 
+                  value={filterType}
+                  onChange={e => setFilterType(e.target.value as any)}
+                  className="bg-black/40 border border-white/5 rounded-xl px-4 py-2.5 text-sm text-white/70 focus:border-white/20 outline-none transition-all cursor-pointer min-w-[160px]"
+                >
+                  <option value="all">All ({searchedUsers.length})</option>
+                  <option value="live">Live Now ({liveUsersCount})</option>
+                  <option value="active">Active Subs ({activeSubsCount})</option>
+                  <option value="new">Newest ({newUsersCount})</option>
+                </select>
+                <div className="relative w-full sm:max-w-xs">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+                  <input 
+                    type="text"
+                    placeholder="Filter users..."
+                    className="w-full bg-black/40 border border-white/5 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white/70 focus:border-white/20 outline-none transition-all placeholder:text-white/10"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
 

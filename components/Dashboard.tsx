@@ -114,6 +114,10 @@ export default function Dashboard({ user }: { user: User }) {
     .toUpperCase()
     .slice(0, 2) ?? "??";
 
+  const isExpired = config ? new Date(config.expiresAt).getTime() < Date.now() : false;
+  const isDataExhausted = config ? config.usedTraffic >= 35 * 1073741824 : false;
+  const needsRenewal = isExpired || isDataExhausted;
+
   return (
     <div className="relative min-h-screen bg-black text-white overflow-x-hidden no-scrollbar">
       {/* Background Dither - Very Dim (Hidden on Mobile) */}
@@ -169,20 +173,20 @@ export default function Dashboard({ user }: { user: User }) {
         <div className="mb-10">
           <h1 className="text-3xl font-black mb-2 tracking-tight">Your VPN Access</h1>
           <p className="text-white/40 text-lg">
-            Copy your subscription link and import it into Hiddify or SpicyVPN Desktop.
+            {needsRenewal ? "Your previous plan has ended. Generate a new one below." : "Copy your subscription link and import it into Hiddify or SpicyVPN Desktop."}
           </p>
         </div>
 
-        {!config ? (
+        {!config || needsRenewal ? (
           <GlassCard intensity={0.1} className="text-center py-20 border-white/5">
             <div className="flex flex-col items-center gap-8">
               <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center border border-white/10 shadow-2xl backdrop-blur-xl">
                 <Wifi className="w-10 h-10 text-white/30" />
               </div>
               <div>
-                <h3 className="text-xl font-bold mb-2">No config yet</h3>
+                <h3 className="text-xl font-bold mb-2">{needsRenewal ? "Plan Ended" : "No config yet"}</h3>
                 <p className="text-white/40 text-lg mb-8 max-w-sm mx-auto">
-                  Generate your personal access link to get started with SpicyVPN.
+                  {needsRenewal ? (isDataExhausted ? "You have reached your 35GB data limit." : "Your 30-day time limit has expired.") : "Generate your personal access link to get started with SpicyVPN."}
                 </p>
                 <Button
                   onClick={generateConfig}
@@ -192,7 +196,7 @@ export default function Dashboard({ user }: { user: User }) {
                   {loading ? (
                     <><RefreshCw className="w-5 h-5 mr-3 animate-spin" /> Generating...</>
                   ) : (
-                    "Generate my access link"
+                    needsRenewal ? "Renew Access Link" : "Generate my access link"
                   )}
                 </Button>
               </div>

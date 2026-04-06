@@ -39,16 +39,23 @@ export async function POST() {
   if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const db = getDb();
+  const now = Math.floor(Date.now() / 1000);
   
-  const existing = db.prepare("SELECT * FROM vpn_configs WHERE userId = ? AND active = 1").get(session.user.id);
+  const existing = db.prepare("SELECT * FROM vpn_configs WHERE userId = ? AND active = 1").get(session.user.id) as any;
   if (existing) {
-    return NextResponse.json({ error: "Active configuration already exists" }, { status: 400 });
+    const isExpired = existing.expiresAt < now;
+    const isDataLimitReached = (existing.totalUp + existing.totalDown) >= (existing.dataLimit || (35 * 1024 * 1024 * 1024));
+
+    if (isExpired || isDataLimitReached) {
+      db.prepare("UPDATE vpn_configs SET active = 0 WHERE id = ?").run(existing.id);
+    } else {
+      return NextResponse.json({ error: "Active configuration already exists" }, { status: 400 });
+    }
   }
 
   const id = randomUUID();
   const uuid = randomUUID(); // Kept for legacy DB structure
   const token = generateToken();
-  const now = Math.floor(Date.now() / 1000);
   const expiresAt = now + (30 * 24 * 60 * 60); // 30 days
   const dataLimit = 35 * 1024 * 1024 * 1024; // 35GB
 

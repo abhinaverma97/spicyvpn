@@ -58,11 +58,12 @@ export async function POST() {
   const token = generateToken();
   const expiresAt = now + (30 * 24 * 60 * 60); // 30 days
   const dataLimit = 35 * 1024 * 1024 * 1024; // 35GB
+  const monthStr = new Date().toISOString().substring(0, 7);
 
   db.prepare(`
-    INSERT INTO vpn_configs (id, userId, uuid, token, expiresAt, active, createdAt, dataLimit)
-    VALUES (?, ?, ?, ?, ?, 1, ?, ?)
-  `).run(id, session.user.id, uuid, token, expiresAt, now, dataLimit);
+    INSERT INTO vpn_configs (id, userId, uuid, token, expiresAt, active, createdAt, dataLimit, lastDataResetMonth)
+    VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)
+  `).run(id, session.user.id, uuid, token, expiresAt, now, dataLimit, monthStr);
 
   return NextResponse.json({
     id,

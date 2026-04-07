@@ -66,6 +66,7 @@ function initSchema(db: Database.Database) {
       nodeId TEXT DEFAULT NULL,
       lastSyncTime INTEGER DEFAULT 0,
       dataLimit INTEGER DEFAULT 37580963840,
+      lastDataResetMonth TEXT DEFAULT NULL,
       FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
     );
 
@@ -120,6 +121,9 @@ function initSchema(db: Database.Database) {
     }
     if (!columns.includes("dataLimit")) {
       db.exec("ALTER TABLE vpn_configs ADD COLUMN dataLimit INTEGER DEFAULT 37580963840;");
+    }
+    if (!columns.includes("lastDataResetMonth")) {
+      db.exec("ALTER TABLE vpn_configs ADD COLUMN lastDataResetMonth TEXT DEFAULT NULL;");
     }
 
     const nodeTableInfo = db.pragma("table_info(nodes)") as any[];

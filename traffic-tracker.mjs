@@ -12,6 +12,7 @@ db.pragma('journal_mode = WAL');
 
 const TRAFFIC_URL = 'http://127.0.0.1:9999/traffic';
 let previousStats = {};
+let isFirstRun = true;
 
 async function trackTraffic() {
   try {
@@ -23,14 +24,10 @@ async function trackTraffic() {
     const monthStr = new Date().toISOString().substring(0, 7);
     db.prepare(`INSERT OR IGNORE INTO monthly_stats (month, totalUp, totalDown) VALUES (?, 0, 0)`).run(monthStr);
 
-    const resetResult = db.prepare(`
-      UPDATE vpn_configs 
-      SET totalUp = 0, totalDown = 0, lastDataResetMonth = ? 
-      WHERE lastDataResetMonth IS NULL OR lastDataResetMonth != ?
-    `).run(monthStr, monthStr);
-    
-    if (resetResult.changes > 0) {
-      console.log(`[${new Date().toISOString()}] Reset data limits for ${resetResult.changes} configs for new month ${monthStr}.`);
+    if (isFirstRun) {
+      previousStats = data;
+      isFirstRun = false;
+      return;
     }
 
     const updateMonthly = db.prepare(`

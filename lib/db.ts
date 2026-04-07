@@ -90,6 +90,12 @@ function initSchema(db: Database.Database) {
       lastTraffic TEXT DEFAULT '{}',
       createdAt INTEGER DEFAULT (unixepoch())
     );
+
+    CREATE TABLE IF NOT EXISTS monthly_stats (
+      month TEXT PRIMARY KEY,
+      totalUp INTEGER DEFAULT 0,
+      totalDown INTEGER DEFAULT 0
+    );
   `);
 
   // Simple migrations for existing tables

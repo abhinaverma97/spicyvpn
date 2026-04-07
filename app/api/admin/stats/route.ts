@@ -53,13 +53,14 @@ export async function GET() {
   const ACTIVE_THRESHOLD = now - 60; 
 
   const globalTraffic = db.prepare(`
-    SELECT SUM(totalUp) as up, SUM(totalDown) as down,
-    (SELECT COUNT(*) FROM vpn_configs WHERE lastActive >= ?) as live_count
-    FROM vpn_configs
+    SELECT (SELECT COUNT(*) FROM vpn_configs WHERE lastActive >= ?) as live_count
   `).get(ACTIVE_THRESHOLD) as any;
   
-  const totalUp = globalTraffic.up || 0;
-  const totalDown = globalTraffic.down || 0;
+  const monthStr = new Date().toISOString().substring(0, 7);
+  const monthlyRow = db.prepare("SELECT totalUp, totalDown FROM monthly_stats WHERE month = ?").get(monthStr) as any;
+  
+  const totalUp = monthlyRow?.totalUp || 0;
+  const totalDown = monthlyRow?.totalDown || 0;
   const totalTraffic = totalUp + totalDown;
   const liveConnections = globalTraffic.live_count;
 

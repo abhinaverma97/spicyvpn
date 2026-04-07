@@ -252,7 +252,7 @@ export default function AdminDashboard({ users: initialUsers }: { users: User[] 
               <div className="text-3xl font-black text-white/80 uppercase tracking-tighter">{vps?.uptime.split(' ')[0]} <span className="text-xs text-white/20">Days</span></div>
             </GlassCard>
             <GlassCard className="p-6 border-white/5" intensity={0.05}>
-              <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2 block">Network Total</span>
+              <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2 block">Network Total (Month)</span>
               <div className="text-3xl font-black text-emerald-400 truncate">{fmt(vps?.totalTrafficBytes || 0)}</div>
             </GlassCard>
           </div>

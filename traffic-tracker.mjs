@@ -20,6 +20,13 @@ async function trackTraffic() {
     const data = await res.json();
     const now = Math.floor(Date.now() / 1000);
 
+    const monthStr = new Date().toISOString().substring(0, 7);
+    db.prepare(`INSERT OR IGNORE INTO monthly_stats (month, totalUp, totalDown) VALUES (?, 0, 0)`).run(monthStr);
+
+    const updateMonthly = db.prepare(`
+      UPDATE monthly_stats SET totalUp = totalUp + ?, totalDown = totalDown + ? WHERE month = ?
+    `);
+
     const updateStmt = db.prepare(`
       UPDATE vpn_configs 
       SET totalUp = totalUp + ?, totalDown = totalDown + ?, lastActive = ?
@@ -42,6 +49,7 @@ async function trackTraffic() {
 
         if (diffTx > 0 || diffRx > 0) {
           updateStmt.run(diffTx, diffRx, now, token);
+          updateMonthly.run(diffTx, diffRx, monthStr);
           updated++;
         }
       }

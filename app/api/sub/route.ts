@@ -42,7 +42,9 @@ export async function GET(req: Request) {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
         "Subscription-Userinfo": `upload=${config.totalUp}; download=${config.totalDown}; total=${35 * 1024 * 1024 * 1024}; expire=${config.expiresAt}`,
-        "Profile-Update-Interval": "1"
+        "Profile-Update-Interval": "1",
+        "x-user-name": Buffer.from(config.name || "User").toString('base64'),
+        "x-user-email": config.email || ""
       }
     });
 

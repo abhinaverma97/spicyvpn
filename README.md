@@ -1,92 +1,119 @@
-# 🌶️ SpicyVPN (StealthVPN) - Hysteria 2 Infrastructure
+# 🌶️ SpicyVPN (StealthVPN) - Enterprise Hysteria 2 Architecture
 
-Welcome to the comprehensive documentation for **SpicyVPN**. This project has fully migrated to the **Hysteria 2** protocol, providing peak performance on high-latency and restrictive networks.
+Welcome to the comprehensive documentation for **SpicyVPN**. This project is a fully integrated, high-performance VPN solution utilizing the **Hysteria 2** protocol, designed to bypass restrictive networks and provide seamless connectivity.
 
 ---
 
 ## 📖 Master Table of Contents
-1. [Architecture Overview](#1-architecture-overview)
-2. [Server Stack: Hysteria 2](#2-server-stack-hysteria-2)
-3. [Network Layer: Port 2053](#3-network-layer-port-2053)
-4. [Control Plane: Next.js Dashboard](#4-control-plane-nextjs-dashboard)
-5. [Client Ecosystem: Hiddify](#5-client-ecosystem-hiddify)
+1. [Tech Stack](#1-tech-stack)
+2. [Architecture & Process Flow](#2-architecture--process-flow)
+3. [How the Frontend Works](#3-how-the-frontend-works)
+4. [How the Backend Works](#4-how-the-backend-works)
+5. [Directory Structure](#5-directory-structure)
 6. [Operational Commands](#6-operational-commands)
 
 ---
 
-## 1. Architecture Overview
+## 1. Tech Stack
 
-SpicyVPN has transitioned from a proxy-based system to a high-speed **UDP-based tunneling** architecture using Hysteria 2. This allows for superior performance in gaming and real-time communication.
+SpicyVPN is built on a modern, full-stack JavaScript ecosystem paired with a high-speed networking core:
 
-### Core Components:
-- **Master Node:** Oracle Ampere A1 (ARM64), 4 OCPUs, 24GB RAM.
-- **VPN Engine:** Standalone **Hysteria 2** (Binary) with HTTP Authentication.
-- **Web Interface:** Next.js 16 (Turbopack) for user and admin dashboards.
-- **Reverse Proxy:** Caddy handles SSL for the web panel and dashboard.
-
----
-
-## 2. Server Stack: Hysteria 2
-
-We have decommissioned Marzban and standardized on native Hysteria 2 for its simplicity and raw speed.
-
-- **Main Config:** `/etc/hysteria/main.yaml`
-- **Authentication:** Integrated via Next.js API (`/api/h2/auth`).
-- **Stats Tracking:** Handled via local HTTP stats endpoint on port 9999.
-- **Key Features:**
-  - Standardized 35GB/30-day data caps enforced at the gateway.
-  - Real-time user authentication directly against the SQLite database.
-  - Brutal congestion control optimized for restricted Wi-Fi.
+- **Frontend Interface:** Next.js 16 (App Router), React 18, Tailwind CSS, Framer Motion.
+- **Backend Control Plane:** Next.js API Routes (Node.js).
+- **Database:** SQLite (via `better-sqlite3`) for zero-latency lookups.
+- **Authentication:** NextAuth.js (Google OAuth).
+- **VPN Core Engine:** Standalone **Hysteria 2** binary (UDP/QUIC protocol).
+- **Infrastructure Management:** `systemd` for process management (Next.js, Hysteria 2, Traffic Tracker).
 
 ---
 
-## 3. Network Layer: Port 2053
+## 2. Architecture & Process Flow
 
-The primary production gateway is now listening on **Port 2053**.
+SpicyVPN separates the "Control Plane" (Next.js/SQLite) from the "Data Plane" (Hysteria 2).
 
-### Why 2053?
-- **Obfuscation:** Commonly used for cloud management, making it less likely to be blocked than standard VPN ports.
-- **UDP Performance:** Hysteria 2 leverages the full power of UDP to eliminate Head-of-Line blocking.
-- **Auto-Update:** Clients automatically refresh their configuration every 1 hour via the `Profile-Update-Interval` header.
-
----
-
-## 4. Control Plane: Next.js Dashboard
-
-The frontend serves as the centralized management console.
-
-### User Dashboard:
-- **Subscription:** Generates **`hy2://`** links compatible with Hiddify.
-- **Usage:** Displays real-time data remaining and expiration dates.
-
-### Admin Dashboard (`/admin`):
-- **Minimalist Design:** Professional, high-density dashboard for fleet oversight.
-- **Live Monitoring:** Real-time tracking of active connections and total network throughput.
-- **User Management:** Full CRUD operations for access keys.
+1. **User Generation:** A user logs into the Next.js site and generates a VPN config. The site creates a secret token and stores it in the SQLite database with a 35GB/30-day quota.
+2. **Client Connection:** The user pastes their `hy2://` URI into their client (SpicyVPN Desktop or Hiddify). The client initiates a UDP QUIC handshake with the server on **Port 8388**.
+3. **HTTP Authentication Webhook:** The Hysteria 2 engine intercepts the connection and fires a silent HTTP POST request to the Next.js API (`/api/h2/auth`), sending the user's token.
+4. **Validation:** Next.js checks the SQLite database. If the token is valid, active, and within its data/time quotas, it responds with a `200 OK`. The VPN tunnel is established.
+5. **Continuous Telemetry:** A background Node.js service (`traffic-tracker.mjs`) polls Hysteria 2 every 10 seconds to collect real-time data usage and writes it back to the database, maintaining perfect synchronization.
 
 ---
 
-## 5. Client Ecosystem
+## 3. How the Frontend Works
 
-### Official Recommendation: Hiddify
-- **Platforms:** Windows, Android, iOS, macOS.
-- **Config:** Import via subscription link (`api/sub?token=...`).
-- **Mode:** For best results, use **VPN Mode** (Admin required on Windows).
+The frontend serves as the centralized management console for both end-users and administrators. It utilizes a unified "Premium Glass" aesthetic.
+
+### **User Dashboard (`/dashboard`):**
+- **Single Connection URI:** Users are provided with a universal `hy2://` URI. This URI contains all routing and security information.
+- **Compatibility:** The UI provides specific connection guides for the **SpicyVPN Desktop App** (Windows/Linux) and **Hiddify** (Mobile/macOS).
+- **Real-Time Expiry:** Visually warns the user when their data limit is hit or their plan expires, prompting them to generate a new key.
+
+### **Admin Console (`/admin`):**
+- **Hardware Telemetry:** Displays real-time CPU, RAM, Storage, and Global Throughput directly from the VPS.
+- **Live Monitoring:** Accurately calculates "Live Now" users by checking if an identity has transmitted data in the last 60 seconds.
+- **Identity Registry:** Administrators can filter the fleet by Live Users, Active Subs, or Newest, and can instantly revoke access keys.
+
+---
+
+## 4. How the Backend Works
+
+The backend logic is entirely self-contained within the Next.js `/api` directory and local Node scripts.
+
+- **`/api/vpn`:** Handles the creation of new identities. It enforces the strict 1-active-config-per-user rule and assigns the 35GB/30-day limits.
+- **`/api/h2/auth`:** The master gatekeeper. This endpoint translates the JSON payload sent natively by Hysteria 2 and strictly rejects any expired or data-exhausted configurations with a `401 Unauthorized`.
+- **`/api/admin/stats`:** Gathers OS-level metrics (via Node.js `os` and `child_process` modules) and aggregates SQLite data to feed the Admin Dashboard.
+- **`/api/sub`:** Acts as an endpoint for Hiddify to auto-update its metrics. It dynamically generates the `Subscription-Userinfo` header so mobile clients can display data limits locally.
+- **Traffic Tracker (`traffic-tracker.mjs`):** A daemonized script running independently of Next.js. It queries Hysteria 2's internal memory (`127.0.0.1:9999/traffic`), calculates the `delta` of bytes transferred since the last check, and updates both the individual user's `vpn_configs` row and the global `monthly_stats` table.
+
+---
+
+## 5. Directory Structure
+
+A high-level map of the codebase and system dependencies:
+
+```text
+/home/ubuntu/.openclaw/workspace/stealthvpn/
+├── app/                        # Next.js App Router root
+│   ├── admin/                  # Admin Console UI
+│   ├── api/                    # Backend Control Plane
+│   │   ├── admin/              # Admin CRUD and VPS Stats logic
+│   │   ├── auth/               # NextAuth endpoints
+│   │   ├── h2/                 # Hysteria 2 Auth Webhook
+│   │   ├── sub/                # Client Subscription API
+│   │   └── vpn/                # User Config Generation
+│   ├── dashboard/              # User Dashboard UI
+│   └── globals.css             # Tailwind & Global Styles
+├── components/                 # React UI Components
+│   ├── AdminDashboard.tsx      # Core Admin Interface
+│   ├── Dashboard.tsx           # Core User Interface
+│   ├── GlassCard.tsx           # Premium UI Wrapper
+│   └── ui/                     # Shadcn Primitives (Buttons, Badges, etc.)
+├── lib/                        # Shared Utilities
+│   ├── auth.ts                 # NextAuth Configuration
+│   └── db.ts                   # SQLite Database Initialization & Migrations
+├── prisma/                     # Database Directory
+│   └── dev.db                  # SQLite Database File (Production State)
+└── traffic-tracker.mjs         # Background Telemetry Sync Daemon
+
+/etc/hysteria/                  # OS-Level VPN Engine Config
+├── main.yaml                   # Core Hysteria 2 Configuration (Port 8388)
+├── server.crt                  # Self-Signed Stealth Certificate
+└── server.key                  # TLS Key
+```
 
 ---
 
 ## 6. Operational Commands
 
 ### Process Management
-- **Hysteria Main:** `sudo systemctl restart hysteria-main`
-- **Hysteria Test:** `sudo systemctl restart hysteria2`
-- **Next.js App:** `sudo systemctl restart stealthvpn`
-- **Check Logs:** `sudo journalctl -u hysteria-main -f`
+- **VPN Engine:** `sudo systemctl restart hysteria-main`
+- **Telemetry Tracker:** `sudo systemctl restart stealthvpn-tracker`
+- **Web App:** `sudo systemctl restart stealthvpn`
 
-### Directory Map
-- `/etc/hysteria`: Server configuration and SSL keys.
-- `/home/ubuntu/.openclaw/workspace/stealthvpn`: Web source code.
-- `/var/lib/marzban`: Legacy data (Read-only).
+### Troubleshooting & Logs
+- **VPN Traffic/Errors:** `sudo journalctl -u hysteria-main -f`
+- **Web App Errors:** `sudo journalctl -u stealthvpn -f`
+- **Tracker Sync Status:** `sudo journalctl -u stealthvpn-tracker -f`
 
 ---
 

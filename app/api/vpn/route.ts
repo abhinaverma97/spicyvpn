@@ -54,7 +54,7 @@ export async function POST() {
   }
 
   const id = randomUUID();
-  const uuid = randomUUID(); // Kept for legacy DB structure
+  const uuid = randomUUID(); // Required by existing NOT NULL schema constraint
   const token = generateToken();
   const expiresAt = now + (30 * 24 * 60 * 60); // 30 days
   const dataLimit = 35 * 1024 * 1024 * 1024; // 35GB
@@ -67,7 +67,6 @@ export async function POST() {
 
   return NextResponse.json({
     id,
-    uuid,
     token,
     expiresAt: new Date(expiresAt * 1000).toISOString(),
     active: true,

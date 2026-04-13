@@ -43,7 +43,8 @@ export async function POST() {
   
   const existing = db.prepare("SELECT * FROM vpn_configs WHERE userId = ? AND active = 1").get(session.user.id) as any;
   if (existing) {
-    const isExpired = existing.expiresAt < now;
+    // Treat as expired if less than 24 hours remain (0 days left)
+    const isExpired = existing.expiresAt <= now + (24 * 60 * 60);
     const isDataLimitReached = (existing.totalUp + existing.totalDown) >= (existing.dataLimit || (35 * 1024 * 1024 * 1024));
 
     if (isExpired || isDataLimitReached) {

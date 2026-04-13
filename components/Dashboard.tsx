@@ -114,9 +114,10 @@ export default function Dashboard({ user }: { user: User }) {
     .toUpperCase()
     .slice(0, 2) ?? "??";
 
-  const isExpired = config ? new Date(config.expiresAt).getTime() < Date.now() : false;
+  const isExpired = config ? daysLeft(config.expiresAt) <= 0 : false;
   const isDataExhausted = config ? config.usedTraffic >= 35 * 1073741824 : false;
-  const needsRenewal = isExpired || isDataExhausted;
+  const isInactive = config ? config.active === false : false;
+  const needsRenewal = isExpired || isDataExhausted || isInactive;
 
   return (
     <div className="relative min-h-screen bg-black text-white overflow-x-hidden no-scrollbar">

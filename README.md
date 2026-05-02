@@ -1,4 +1,4 @@
-# 🌶️ SpicyVPN (StealthVPN) - Enterprise VLESS gRPC Architecture
+# SpicyVPN (StealthVPN) - Enterprise VLESS gRPC Architecture
 
 Welcome to the comprehensive documentation for **SpicyVPN**. This project is a fully integrated, high-performance VPN solution utilizing the **VLESS + gRPC** protocol via **Xray-core**, designed to bypass restrictive DPI (Deep Packet Inspection) networks and provide seamless connectivity with maximum stealth.
 

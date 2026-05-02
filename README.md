@@ -4,7 +4,7 @@ Welcome to the comprehensive documentation for **SpicyVPN**. This project is a f
 
 ---
 
-## 📖 Master Table of Contents
+## Table of Contents
 1. [Tech Stack](#1-tech-stack)
 2. [Architecture & Process Flow](#2-architecture--process-flow)
 3. [Frontend Details (Control Plane)](#3-frontend-details-control-plane)

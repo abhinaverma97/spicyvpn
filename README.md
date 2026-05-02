@@ -1,4 +1,4 @@
-# 🌶️ SpicyVPN (StealthVPN) - Enterprise Hysteria 2 Architecture
+#SpicyVPN (StealthVPN) - Enterprise Hysteria 2 Architecture
 
 Welcome to the comprehensive documentation for **SpicyVPN**. This project is a fully integrated, high-performance VPN solution utilizing the **Hysteria 2** protocol, designed to bypass restrictive networks and provide seamless connectivity.
 

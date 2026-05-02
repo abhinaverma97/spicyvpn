@@ -41,7 +41,6 @@ type User = {
   name: string;
   joinedAt: string;
   token: string | null;
-  uuid: string | null;
   expiresAt: string | null;
   active: boolean;
   usedTraffic: number;
@@ -112,10 +111,10 @@ export default function AdminDashboard({ users: initialUsers }: { users: User[] 
 
   function daysLeft(expiresAt: any) {
     if (!expiresAt) return -1;
-    // If it's a number, assume it's Unix seconds and convert to ms
     const expiryMs = typeof expiresAt === 'number' ? expiresAt * 1000 : new Date(expiresAt).getTime();
     const diff = expiryMs - Date.now();
-    return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+    if (diff <= 0) return -2; // Expired
+    return Math.floor(diff / (1000 * 60 * 60 * 24));
   }
 
   if (!mounted) return null;
@@ -123,15 +122,29 @@ export default function AdminDashboard({ users: initialUsers }: { users: User[] 
   const searchedUsers = users.filter(u => 
     u.email.toLowerCase().includes(search.toLowerCase()) || 
     u.name.toLowerCase().includes(search.toLowerCase()) ||
-    u.uuid?.toLowerCase().includes(search.toLowerCase())
+    u.token?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const liveUsersCount = users.filter(u => vps?.liveUsers?.includes(u.uuid as string)).length;
-  const activeSubsCount = users.filter(u => u.active && u.expiresAt && (typeof u.expiresAt === 'number' ? u.expiresAt * 1000 : new Date(u.expiresAt).getTime()) > Date.now()).length;
+  const DATA_LIMIT = 50 * 1024 * 1024 * 1024;
+  
+  const liveUsersCount = users.filter(u => vps?.liveUsers?.includes(u.token as string)).length;
+  const activeSubsCount = users.filter(u => {
+    if (!u.active || !u.expiresAt) return false;
+    const expiryMs = typeof u.expiresAt === 'number' ? u.expiresAt * 1000 : new Date(u.expiresAt).getTime();
+    const isTimeActive = expiryMs > Date.now();
+    const isDataActive = u.usedTraffic < (u.dataLimit > 0 ? u.dataLimit : DATA_LIMIT);
+    return isTimeActive && isDataActive;
+  }).length;
 
   const filteredUsers = searchedUsers.filter(u => {
-    if (filterType === "live") return vps?.liveUsers?.includes(u.uuid as string);
-    if (filterType === "active") return u.active && u.expiresAt && (typeof u.expiresAt === 'number' ? u.expiresAt * 1000 : new Date(u.expiresAt).getTime()) > Date.now();
+    if (filterType === "live") return vps?.liveUsers?.includes(u.token as string);
+    if (filterType === "active") {
+      if (!u.active || !u.expiresAt) return false;
+      const expiryMs = typeof u.expiresAt === 'number' ? u.expiresAt * 1000 : new Date(u.expiresAt).getTime();
+      const isTimeActive = expiryMs > Date.now();
+      const isDataActive = u.usedTraffic < (u.dataLimit > 0 ? u.dataLimit : DATA_LIMIT);
+      return isTimeActive && isDataActive;
+    }
     return true; // 'new' and 'all' show everyone
   });
 
@@ -142,8 +155,8 @@ export default function AdminDashboard({ users: initialUsers }: { users: User[] 
     }
     
     // Default sorting: Live first, then by highest data usage
-    const aLive = vps?.liveUsers?.includes(a.uuid as string) ? 1 : 0;
-    const bLive = vps?.liveUsers?.includes(b.uuid as string) ? 1 : 0;
+    const aLive = vps?.liveUsers?.includes(a.token as string) ? 1 : 0;
+    const bLive = vps?.liveUsers?.includes(b.token as string) ? 1 : 0;
     if (aLive !== bLive) return bLive - aLive;
     return b.usedTraffic - a.usedTraffic;
   });
@@ -300,8 +313,8 @@ export default function AdminDashboard({ users: initialUsers }: { users: User[] 
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {sortedUsers.map((u, i) => {
-                    const isLive = vps?.liveUsers?.includes(u.uuid as string);
-                    const limit = 35 * 1024 * 1024 * 1024;
+                    const isLive = vps?.liveUsers?.includes(u.token as string);
+                    const limit = u.dataLimit || (50 * 1024 * 1024 * 1024);
                     const usagePct = (u.usedTraffic / limit) * 100;
                     
                     return (
@@ -332,7 +345,7 @@ export default function AdminDashboard({ users: initialUsers }: { users: User[] 
                           <div className="w-40 space-y-1.5">
                             <div className="flex justify-between text-[10px] font-bold">
                               <span className={isLive ? "text-emerald-400" : "text-white/40"}>{fmt(u.usedTraffic)}</span>
-                              <span className="text-white/10 uppercase tracking-tighter italic">Cap 35 GB</span>
+                              <span className="text-white/10 uppercase tracking-tighter italic">Cap {Math.floor(u.dataLimit / 1024 / 1024 / 1024)} GB</span>
                             </div>
                             <div className="h-1 bg-white/5 rounded-full overflow-hidden border border-white/5">
                               <div 
@@ -344,8 +357,8 @@ export default function AdminDashboard({ users: initialUsers }: { users: User[] 
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="inline-flex flex-col items-end">
-                            <p className={`text-xs font-bold ${daysLeft(u.expiresAt) !== -1 && daysLeft(u.expiresAt) < 3 ? 'text-red-400' : 'text-white/70'}`}>
-                              {daysLeft(u.expiresAt) === -1 ? 'NO PLAN' : `${daysLeft(u.expiresAt)} DAYS`}
+                            <p className={`text-xs font-bold ${daysLeft(u.expiresAt) === -2 || (daysLeft(u.expiresAt) !== -1 && daysLeft(u.expiresAt) < 3) ? 'text-red-400' : 'text-white/70'}`}>
+                              {daysLeft(u.expiresAt) === -1 ? 'NO PLAN' : daysLeft(u.expiresAt) === -2 ? 'EXPIRED' : `${daysLeft(u.expiresAt)} DAYS`}
                             </p>
                             <p className="text-[9px] text-white/20 font-bold uppercase tracking-widest mt-0.5">Remaining</p>
                           </div>
@@ -354,7 +367,7 @@ export default function AdminDashboard({ users: initialUsers }: { users: User[] 
                           <div className="flex items-center justify-end">
                             {confirmId === u.id ? (
                               <div className="flex items-center gap-2 animate-in zoom-in-95">
-                                <button onClick={() => deleteUser(u.id)} className="text-[9px] font-bold text-red-400 bg-red-400/10 px-2 py-1 rounded-lg border border-red-400/20 hover:bg-red-400/20 transition-all uppercase tracking-widest">Revoke</button>
+                                <button onClick={() => deleteUser(u.id)} className="text-[9px] font-bold text-red-400 bg-red-400/10 px-2 py-1 rounded-lg border border-red-500/20 hover:bg-red-500/20 transition-all uppercase tracking-widest">Revoke</button>
                                 <button onClick={() => setConfirmId(null)} className="text-[9px] font-bold text-white/30 uppercase px-2">Esc</button>
                               </div>
                             ) : (

@@ -1,5 +1,7 @@
 import { getDb } from "@/lib/db";
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -32,16 +34,15 @@ export async function GET(req: Request) {
     db.prepare(`INSERT OR IGNORE INTO token_devices (token, ip, lastSeen) VALUES (?, ?, ?)`).run(token, clientIp, now);
     db.prepare(`UPDATE token_devices SET lastSeen = ? WHERE token = ? AND ip = ?`).run(now, token, clientIp);
 
-    // Return the Hysteria 2 connection link directly as the subscription content
-    // We base64 encode it as that is standard for subscription lists
+    // Return the VLESS + gRPC connection link directly as the subscription content
     const userName = config.name ? config.name.split(" ")[0] : "User";
-    const hy2Link = `hy2://${config.token}@140.245.13.64:8388?insecure=1&sni=www.microsoft.com#SpicyVPN-${userName}`;
-    const base64Data = Buffer.from(hy2Link).toString('base64');
+    const vlessLink = `vless://${config.uuid}@140.245.13.64:8444?security=tls&sni=spicypepper.app&type=grpc&serviceName=spicypepper-grpc#SpicyVPN-${userName}`;
+    const base64Data = Buffer.from(vlessLink).toString('base64');
 
     return new Response(base64Data, {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
-        "Subscription-Userinfo": `upload=${config.totalUp}; download=${config.totalDown}; total=${35 * 1024 * 1024 * 1024}; expire=${config.expiresAt}`,
+        "Subscription-Userinfo": `upload=${config.totalUp}; download=${config.totalDown}; total=${config.dataLimit}; expire=${config.expiresAt}`,
         "Profile-Update-Interval": "1",
         "x-user-name": Buffer.from(config.name || "User").toString('base64'),
         "x-user-email": config.email || ""

@@ -92,7 +92,7 @@ export async function GET() {
     network: { rx: totalDown, tx: totalUp }, 
     connections: liveConnections,
     liveUsers: liveUsers, 
-    hysteriaStatus: "active",
+    vlessStatus: "active",
     totalUsers: totalUsersCount,
     activeUsers: activeConfigsCount,
     totalTrafficBytes: totalTraffic,

@@ -1,14 +1,14 @@
-# SpicyVPN (StealthVPN) - Enterprise Hysteria 2 Architecture
+# 🌶️ SpicyVPN (StealthVPN) - Enterprise VLESS gRPC Architecture
 
-Welcome to the comprehensive documentation for **SpicyVPN**. This project is a fully integrated, high-performance VPN solution utilizing the **Hysteria 2** protocol, designed to bypass restrictive networks and provide seamless connectivity.
+Welcome to the comprehensive documentation for **SpicyVPN**. This project is a fully integrated, high-performance VPN solution utilizing the **VLESS + gRPC** protocol via **Xray-core**, designed to bypass restrictive DPI (Deep Packet Inspection) networks and provide seamless connectivity with maximum stealth.
 
 ---
 
 ## 📖 Master Table of Contents
 1. [Tech Stack](#1-tech-stack)
 2. [Architecture & Process Flow](#2-architecture--process-flow)
-3. [How the Frontend Works](#3-how-the-frontend-works)
-4. [How the Backend Works](#4-how-the-backend-works)
+3. [Frontend Details (Control Plane)](#3-frontend-details-control-plane)
+4. [Backend Details (Data Plane & APIs)](#4-backend-details-data-plane--apis)
 5. [Directory Structure](#5-directory-structure)
 6. [Operational Commands](#6-operational-commands)
 
@@ -18,52 +18,64 @@ Welcome to the comprehensive documentation for **SpicyVPN**. This project is a f
 
 SpicyVPN is built on a modern, full-stack JavaScript ecosystem paired with a high-speed networking core:
 
-- **Frontend Interface:** Next.js 16 (App Router), React 18, Tailwind CSS, Framer Motion.
-- **Backend Control Plane:** Next.js API Routes (Node.js).
-- **Database:** SQLite (via `better-sqlite3`) for zero-latency lookups.
+- **Frontend Interface:** Next.js 16 (App Router, Turbopack), React 18, Tailwind CSS, Framer Motion.
+- **Backend APIs:** Next.js Serverless API Routes (Node.js).
+- **Database:** SQLite (via `better-sqlite3` with WAL mode) for zero-latency, high-concurrency lookups.
 - **Authentication:** NextAuth.js (Google OAuth).
-- **VPN Core Engine:** Standalone **Hysteria 2** binary (UDP/QUIC protocol).
-- **Infrastructure Management:** `systemd` for process management (Next.js, Hysteria 2, Traffic Tracker).
+- **VPN Core Engine:** **Xray-core** v26+ (VLESS protocol over gRPC transport).
+- **Telemetry & Sync:** Node.js Daemon utilizing the Xray gRPC API (`10085`).
+- **Infrastructure Management:** `systemd` for process daemonization.
 
 ---
 
 ## 2. Architecture & Process Flow
 
-SpicyVPN separates the "Control Plane" (Next.js/SQLite) from the "Data Plane" (Hysteria 2).
+SpicyVPN strictly separates the "Control Plane" (Next.js & SQLite) from the "Data Plane" (Xray).
 
-1. **User Generation:** A user logs into the Next.js site and generates a VPN config. The site creates a secret token and stores it in the SQLite database with a 35GB/30-day quota.
-2. **Client Connection:** The user pastes their `hy2://` URI into their client (SpicyVPN Desktop or Hiddify). The client initiates a UDP QUIC handshake with the server on **Port 8388**.
-3. **HTTP Authentication Webhook:** The Hysteria 2 engine intercepts the connection and fires a silent HTTP POST request to the Next.js API (`/api/h2/auth`), sending the user's token.
-4. **Validation:** Next.js checks the SQLite database. If the token is valid, active, and within its data/time quotas, it responds with a `200 OK`. The VPN tunnel is established.
-5. **Continuous Telemetry:** A background Node.js service (`traffic-tracker.mjs`) polls Hysteria 2 every 10 seconds to collect real-time data usage and writes it back to the database, maintaining perfect synchronization.
-
----
-
-## 3. How the Frontend Works
-
-The frontend serves as the centralized management console for both end-users and administrators. It utilizes a unified "Premium Glass" aesthetic.
-
-### **User Dashboard (`/dashboard`):**
-- **Single Connection URI:** Users are provided with a universal `hy2://` URI. This URI contains all routing and security information.
-- **Compatibility:** The UI provides specific connection guides for the **SpicyVPN Desktop App** (Windows/Linux) and **Hiddify** (Mobile/macOS).
-- **Real-Time Expiry:** Visually warns the user when their data limit is hit or their plan expires, prompting them to generate a new key.
-
-### **Admin Console (`/admin`):**
-- **Hardware Telemetry:** Displays real-time CPU, RAM, Storage, and Global Throughput directly from the VPS.
-- **Live Monitoring:** Accurately calculates "Live Now" users by checking if an identity has transmitted data in the last 60 seconds.
-- **Identity Registry:** Administrators can filter the fleet by Live Users, Active Subs, or Newest, and can instantly revoke access keys.
+1. **Identity Generation:** A user logs into the Next.js site and generates a VPN config. The application generates a secure `token` (for internal tracking) and a `uuid` (for VLESS authentication). This is stored in SQLite with a dynamic data limit (default: 50GB) and a 30-day expiry.
+2. **Subscription Delivery:** The user imports a subscription link into their client (Hiddify, Nekobox, or SpicyVPN Desktop). The `/api/sub` endpoint dynamically generates a `vless://` URI configured for the gRPC transport on Port **8444**.
+3. **Continuous State Sync:** A background Node.js service (`xray-traffic-tracker.mjs`) polls the SQLite database every 10 seconds. It compares the database's active users against Xray's memory.
+   - It issues `xray api adu` (Add User) commands for any new active users.
+   - It issues `xray api rmu` (Remove User) commands for any users who were manually deactivated by an admin.
+4. **Telemetry & Enforcement:** The same tracker queries Xray's internal statistics API (`xray api statsquery`). It aggregates `uplink` and `downlink` bytes, updating the `totalUp` and `totalDown` columns in SQLite.
+   - **The Kicker:** If a user's total usage exceeds their dynamic `dataLimit`, or their 30-day window expires, the tracker instantly drops their active connection in Xray and flags `active=0` in the database to prevent re-authentication.
 
 ---
 
-## 4. How the Backend Works
+## 3. Frontend Details (Control Plane)
 
-The backend logic is entirely self-contained within the Next.js `/api` directory and local Node scripts.
+The frontend serves as the centralized management console, utilizing a unified "Premium Glass" aesthetic.
 
-- **`/api/vpn`:** Handles the creation of new identities. It enforces the strict 1-active-config-per-user rule and assigns the 35GB/30-day limits.
-- **`/api/h2/auth`:** The master gatekeeper. This endpoint translates the JSON payload sent natively by Hysteria 2 and strictly rejects any expired or data-exhausted configurations with a `401 Unauthorized`.
-- **`/api/admin/stats`:** Gathers OS-level metrics (via Node.js `os` and `child_process` modules) and aggregates SQLite data to feed the Admin Dashboard.
-- **`/api/sub`:** Acts as an endpoint for Hiddify to auto-update its metrics. It dynamically generates the `Subscription-Userinfo` header so mobile clients can display data limits locally.
-- **Traffic Tracker (`traffic-tracker.mjs`):** A daemonized script running independently of Next.js. It queries Hysteria 2's internal memory (`127.0.0.1:9999/traffic`), calculates the `delta` of bytes transferred since the last check, and updates both the individual user's `vpn_configs` row and the global `monthly_stats` table.
+### **User Dashboard (`/dashboard`)**
+- **Dynamic Config Management:** Reads the user's specific `dataLimit` and `expiresAt` timestamps from the database. Calculates remaining days and gigabytes dynamically.
+- **Renewal Logic:** If a user exhausts their data limit or their time expires, the UI shifts states to allow them to "Renew Access Link," which interacts with `/api/vpn` to issue a fresh UUID and reset their limits.
+- **Client Guides:** Provides direct download links to the custom **SpicyVPN Desktop App** (v1.0.64+) and guides for Hiddify/Nekobox.
+
+### **Admin Console (`/admin`)**
+- **Live Fleet Monitoring:** Accurately calculates "Live Now" users. It determines this by scanning the database for any user whose `lastActive` timestamp was updated by the traffic tracker within the last 60 seconds.
+- **Hardware Telemetry:** Displays real-time VPS CPU load, Memory usage, Storage, and Global Throughput by executing low-level shell commands (`os.cpus()`, `df`, etc.) via the `/api/admin/stats` route.
+- **Identity Registry:** Allows administrators to filter the fleet (Live Users, Active Subs, Newest) and forcefully revoke access keys. Revocations are detected by the sync daemon and instantly pushed to Xray.
+
+---
+
+## 4. Backend Details (Data Plane & APIs)
+
+The backend logic is self-contained within the Next.js `/api` directory and standalone Node scripts.
+
+### **Next.js API Routes**
+- **`/api/vpn`:** Handles the creation and renewal of identities. It enforces a strict 1-active-config-per-user rule. When generating, it sets `expiresAt` (now + 30 days) and `dataLimit` (50GB).
+- **`/api/admin/stats`:** Gathers OS-level metrics and aggregates SQLite data to feed the Admin Dashboard.
+- **`/api/sub`:** Acts as the endpoint for client auto-updates. 
+  - Validates the user token.
+  - Updates the `token_devices` table to track client IP addresses.
+  - Dynamically constructs the Base64-encoded `vless://` payload.
+  - Returns `Subscription-Userinfo` headers so mobile clients can natively display upload/download stats and data limits locally.
+
+### **The Telemetry Daemon (`xray-traffic-tracker.mjs`)**
+This is the core engine connecting the web database to the VPN server. It runs continuously via `systemd` (`xray-tracker.service`).
+- **Target:** Connects to Xray's API port on `127.0.0.1:10085`.
+- **Target Tag:** Pushes configurations explicitly to the `vless-grpc` inbound tag on Port 8444.
+- **Conflict Resolution:** Maintains a `Set` of known tokens to minimize unnecessary API calls to Xray. It handles concurrent additions/removals safely and logs all Kicker and Cleanup events.
 
 ---
 
@@ -78,27 +90,24 @@ A high-level map of the codebase and system dependencies:
 │   ├── api/                    # Backend Control Plane
 │   │   ├── admin/              # Admin CRUD and VPS Stats logic
 │   │   ├── auth/               # NextAuth endpoints
-│   │   ├── h2/                 # Hysteria 2 Auth Webhook
 │   │   ├── sub/                # Client Subscription API
-│   │   └── vpn/                # User Config Generation
+│   │   └── vpn/                # User Config Generation/Renewal
 │   ├── dashboard/              # User Dashboard UI
 │   └── globals.css             # Tailwind & Global Styles
 ├── components/                 # React UI Components
 │   ├── AdminDashboard.tsx      # Core Admin Interface
 │   ├── Dashboard.tsx           # Core User Interface
-│   ├── GlassCard.tsx           # Premium UI Wrapper
-│   └── ui/                     # Shadcn Primitives (Buttons, Badges, etc.)
+│   └── GlassCard.tsx           # Premium UI Wrapper
 ├── lib/                        # Shared Utilities
 │   ├── auth.ts                 # NextAuth Configuration
-│   └── db.ts                   # SQLite Database Initialization & Migrations
+│   └── db.ts                   # SQLite Schema & Migrations
 ├── prisma/                     # Database Directory
-│   └── dev.db                  # SQLite Database File (Production State)
-└── traffic-tracker.mjs         # Background Telemetry Sync Daemon
+│   └── dev.db                  # SQLite Database File
+├── xray-traffic-tracker.mjs    # Background Sync, Telemetry & Kicker Service
+└── xray-bulk-load.mjs          # Utility: One-time DB-to-Xray Migration Script
 
-/etc/hysteria/                  # OS-Level VPN Engine Config
-├── main.yaml                   # Core Hysteria 2 Configuration (Port 8388)
-├── server.crt                  # Self-Signed Stealth Certificate
-└── server.key                  # TLS Key
+/usr/local/etc/xray/            # OS-Level Xray Config
+└── config.json                 # Core Xray Configuration (Ports 8444, 10085)
 ```
 
 ---
@@ -106,14 +115,14 @@ A high-level map of the codebase and system dependencies:
 ## 6. Operational Commands
 
 ### Process Management
-- **VPN Engine:** `sudo systemctl restart hysteria-main`
-- **Telemetry Tracker:** `sudo systemctl restart stealthvpn-tracker`
-- **Web App:** `sudo systemctl restart stealthvpn`
+- **VPN Core Engine:** `sudo systemctl restart xray`
+- **Telemetry Sync Daemon:** `sudo systemctl restart xray-tracker`
+- **Web Application:** `sudo systemctl restart stealthvpn`
 
 ### Troubleshooting & Logs
-- **VPN Traffic/Errors:** `sudo journalctl -u hysteria-main -f`
+- **VPN Connections & Errors:** `sudo journalctl -u xray -f`
 - **Web App Errors:** `sudo journalctl -u stealthvpn -f`
-- **Tracker Sync Status:** `sudo journalctl -u stealthvpn-tracker -f`
+- **Sync/Kicker Activity:** `sudo journalctl -u xray-tracker -f`
 
 ---
 

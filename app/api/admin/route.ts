@@ -16,7 +16,7 @@ export async function GET() {
   const dbUsers = db.prepare(`
     SELECT 
       users.id, users.name, users.email, users.image, users.createdAt,
-      vpn_configs.uuid, vpn_configs.token, vpn_configs.expiresAt, vpn_configs.active, vpn_configs.lastActive, vpn_configs.lastSyncTime,
+      vpn_configs.token, vpn_configs.expiresAt, vpn_configs.active, vpn_configs.lastActive, vpn_configs.lastSyncTime,
       vpn_configs.totalUp, vpn_configs.totalDown, vpn_configs.dataLimit
     FROM users
     LEFT JOIN vpn_configs ON users.id = vpn_configs.userId AND vpn_configs.active = 1

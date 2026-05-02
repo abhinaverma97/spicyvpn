@@ -23,11 +23,13 @@ export default async function AdminPage() {
       u.email,
       u.name,
       u.createdAt,
-      v.uuid,
       v.token,
       v.expiresAt,
       v.active,
       v.lastActive,
+      v.totalUp,
+      v.totalDown,
+      v.dataLimit,
       v.createdAt as configCreatedAt,
       (SELECT COUNT(*) FROM token_devices td WHERE td.token = v.token) as deviceCount
     FROM users u
@@ -45,13 +47,12 @@ export default async function AdminPage() {
         name: u.name as string,
         joinedAt: new Date((u.createdAt as number) * 1000).toISOString(),
         token: u.token as string | null,
-        uuid: u.uuid as string | null,
         expiresAt: u.expiresAt ? new Date((u.expiresAt as number) * 1000).toISOString() : null,
         active: Boolean(u.active),
         deviceCount: 0,
         lastActive: Number(u.lastActive || 0),
-        usedTraffic: 0,
-        dataLimit: -1,
+        usedTraffic: (u.totalUp as number || 0) + (u.totalDown as number || 0),
+        dataLimit: u.dataLimit as number || 37580963840,
       }))}
 
     />

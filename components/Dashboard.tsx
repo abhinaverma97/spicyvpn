@@ -115,7 +115,7 @@ export default function Dashboard({ user }: { user: User }) {
     .slice(0, 2) ?? "??";
 
   const isExpired = config ? daysLeft(config.expiresAt) <= 0 : false;
-  const isDataExhausted = config ? config.usedTraffic >= 35 * 1073741824 : false;
+  const isDataExhausted = config ? config.usedTraffic >= config.dataLimit : false;
   const isInactive = config ? config.active === false : false;
   const needsRenewal = isExpired || isDataExhausted || isInactive;
 
@@ -187,7 +187,7 @@ export default function Dashboard({ user }: { user: User }) {
               <div>
                 <h3 className="text-xl font-bold mb-2">{needsRenewal ? "Plan Ended" : "No config yet"}</h3>
                 <p className="text-white/40 text-lg mb-8 max-w-sm mx-auto">
-                  {needsRenewal ? (isDataExhausted ? "You have reached your 35GB data limit." : "Your 30-day time limit has expired.") : "Generate your personal access link to get started with SpicyVPN."}
+                  {needsRenewal ? (isDataExhausted ? `You have reached your ${config ? Math.floor(config.dataLimit / 1073741824) : 50}GB data limit.` : "Your 30-day time limit has expired.") : "Generate your personal access link to get started with SpicyVPN."}
                 </p>
                 <Button
                   onClick={generateConfig}
@@ -215,7 +215,7 @@ export default function Dashboard({ user }: { user: User }) {
 
               <GlassCard className="p-8 flex flex-col items-center justify-center text-center space-y-3 border-white/5" intensity={0.05}>
                 <div className="text-5xl font-black tracking-tighter text-white/90 leading-none">
-                  {Math.max(0, (35 * 1073741824 - config.usedTraffic) / 1073741824).toFixed(1)}
+                  {Math.max(0, ((config?.dataLimit || 53687091200) - config.usedTraffic) / 1073741824).toFixed(1)}
                   <span className="text-2xl text-white/20 ml-1">GB</span>
                 </div>
                 <div className="text-xs font-bold text-white/30 uppercase tracking-[0.2em]">Data Left</div>
@@ -340,7 +340,7 @@ export default function Dashboard({ user }: { user: User }) {
                     <span className="text-lg font-bold text-white/80">Windows</span>
                     <div className="ml-auto flex gap-2">
                       <a
-                        href="https://github.com/abhinaverma97/spicyvpn-desktop/releases/download/v0.2.37/SpicyVPN_0.1.0_x64-setup.exe"
+                        href="https://github.com/abhinaverma97/spicyvpn-desktop/releases/download/v1.0.64/SpicyVPN_0.1.0_x64-setup.exe"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-sm font-bold px-4 py-2 rounded-xl border border-emerald-500/20 text-emerald-400 hover:border-emerald-500/40 hover:text-emerald-300 transition-all bg-emerald-500/5"
@@ -469,7 +469,7 @@ export default function Dashboard({ user }: { user: User }) {
                 Config expires {new Date(config.expiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
               </span>
               <Shield className="w-3.5 h-3.5 text-white/20 ml-auto" />
-              <span className="text-base text-white/20">Secured with Hysteria 2</span>
+              <span className="text-base text-white/20">Secured with VLESS (QUIC)</span>
             </div>
 
           </div>

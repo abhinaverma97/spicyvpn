@@ -29,7 +29,7 @@ export async function GET() {
     active: Boolean(row.active),
     createdAt: new Date(row.createdAt * 1000).toISOString(),
     usedTraffic: (row.totalUp || 0) + (row.totalDown || 0),
-    dataLimit: row.dataLimit || (35 * 1024 * 1024 * 1024),
+    dataLimit: row.dataLimit || (50 * 1024 * 1024 * 1024),
     deviceCount: row.deviceCount || 0,
   })));
 }
@@ -45,7 +45,7 @@ export async function POST() {
   if (existing) {
     // Treat as expired if less than 24 hours remain (0 days left)
     const isExpired = existing.expiresAt <= now + (24 * 60 * 60);
-    const isDataLimitReached = (existing.totalUp + existing.totalDown) >= (existing.dataLimit || (35 * 1024 * 1024 * 1024));
+    const isDataLimitReached = (existing.totalUp + existing.totalDown) >= (existing.dataLimit || (50 * 1024 * 1024 * 1024));
 
     if (isExpired || isDataLimitReached) {
       db.prepare("UPDATE vpn_configs SET active = 0 WHERE id = ?").run(existing.id);
@@ -58,7 +58,7 @@ export async function POST() {
   const uuid = randomUUID(); // Required by existing NOT NULL schema constraint
   const token = generateToken();
   const expiresAt = now + (30 * 24 * 60 * 60); // 30 days
-  const dataLimit = 35 * 1024 * 1024 * 1024; // 35GB
+  const dataLimit = 50 * 1024 * 1024 * 1024; // 50GB
   const monthStr = new Date().toISOString().substring(0, 7);
 
   db.prepare(`

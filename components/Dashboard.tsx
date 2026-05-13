@@ -340,7 +340,7 @@ export default function Dashboard({ user }: { user: User }) {
                     <span className="text-lg font-bold text-white/80">Windows</span>
                     <div className="ml-auto flex gap-2">
                       <a
-                        href="https://github.com/abhinaverma97/spicyvpn-desktop/releases/download/v1.0.64/SpicyVPN_0.1.0_x64-setup.exe"
+                        href="https://github.com/abhinaverma97/spicyvpn-desktop/releases/download/v1.0.67/SpicyVPN_1.0.67_x64-setup.exe"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-sm font-bold px-4 py-2 rounded-xl border border-emerald-500/20 text-emerald-400 hover:border-emerald-500/40 hover:text-emerald-300 transition-all bg-emerald-500/5"

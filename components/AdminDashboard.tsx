@@ -109,12 +109,40 @@ export default function AdminDashboard({ users: initialUsers }: { users: User[] 
     setConfirmId(null);
   }
 
+  async function addNode() {
+    setLoading(true);
+    try {
+      const name = prompt("Enter Node Name (e.g., Singapore-ARM-1):");
+      if (!name) return;
+      const ip = prompt("Enter Node Public IP:");
+      if (!ip) return;
+
+      const res = await fetch("/api/admin/nodes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, ip })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        alert(`Node created successfully!\n\nRun this command on your VPS:\n\n${data.installCommand}`);
+      } else {
+        alert("Failed to create node.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("An error occurred.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function daysLeft(expiresAt: any) {
     if (!expiresAt) return -1;
     const expiryMs = typeof expiresAt === 'number' ? expiresAt * 1000 : new Date(expiresAt).getTime();
     const diff = expiryMs - Date.now();
-    if (diff <= 0) return -2; // Expired
-    return Math.floor(diff / (1000 * 60 * 60 * 24));
+    if (diff < 0) return -2; // Expired
+    return Math.floor(diff / (1000 * 60 * 60 * 24)); // Will be 0 if diff > 0 but < 24 hours
   }
 
   if (!mounted) return null;
@@ -190,6 +218,14 @@ export default function AdminDashboard({ users: initialUsers }: { users: User[] 
             </div>
 
             <div className="flex items-center gap-4">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={addNode}
+                className="bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 text-emerald-400 h-8 text-[10px] font-bold uppercase tracking-widest mr-2"
+              >
+                + Add Node
+              </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
@@ -274,7 +310,7 @@ export default function AdminDashboard({ users: initialUsers }: { users: User[] 
           <GlassCard className="overflow-hidden border-white/5" intensity={0.08}>
             <div className="p-6 border-b border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
-                <Users className="w-5 h-5 text-white/30" /> Identity Registry
+                <Users className="w-5 h-5 text-white/30" /> Users
               </h2>
               <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
                 <select 

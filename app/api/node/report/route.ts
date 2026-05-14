@@ -24,14 +24,7 @@ export async function POST(req: Request) {
     const monthStr = new Date().toISOString().substring(0, 7);
 
     db.transaction(() => {
-      // 1. Update Node Stats
-      db.prepare(`
-        UPDATE nodes 
-        SET cpuUsage = ?, ramUsage = ?, liveUsers = ?, lastHeartbeat = ?, status = 'active'
-        WHERE id = ?
-      `).run(cpuUsage, ramUsage, liveUsers, now, node.id);
-
-      // 2. Update Traffic for users assigned to this node
+      // 1. Update Traffic for users assigned to this node first
       if (trafficStats && typeof trafficStats === 'object') {
         for (const [token, stats] of Object.entries(trafficStats) as [string, any][]) {
           const diffUp = stats.diffUp || 0;
@@ -49,6 +42,17 @@ export async function POST(req: Request) {
           }
         }
       }
+
+      // 2. Accurate Live Users check matching the Admin Dashboard logic (active within last 60s)
+      const liveUsersQuery = db.prepare(`SELECT COUNT(*) as count FROM vpn_configs WHERE lastActive >= ? AND nodeId = ?`).get(now - 60, node.id) as any;
+      const calculatedLiveUsers = liveUsersQuery ? liveUsersQuery.count : 0;
+
+      // 3. Update Node Stats
+      db.prepare(`
+        UPDATE nodes 
+        SET cpuUsage = ?, ramUsage = ?, liveUsers = ?, lastHeartbeat = ?, status = 'active'
+        WHERE id = ?
+      `).run(cpuUsage, ramUsage, calculatedLiveUsers, now, node.id);
     })();
 
     return NextResponse.json({ success: true });

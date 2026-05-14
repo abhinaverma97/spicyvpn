@@ -104,7 +104,8 @@ export default function Dashboard({ user }: { user: User }) {
 
   function daysLeft(expiresAt: string) {
     const diff = new Date(expiresAt).getTime() - Date.now();
-    return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+    if (diff < 0) return -1; // Expired
+    return Math.floor(diff / (1000 * 60 * 60 * 24)); // 0 means < 24 hours
   }
 
   const initials = user.name
@@ -114,7 +115,7 @@ export default function Dashboard({ user }: { user: User }) {
     .toUpperCase()
     .slice(0, 2) ?? "??";
 
-  const isExpired = config ? daysLeft(config.expiresAt) <= 0 : false;
+  const isExpired = config ? new Date(config.expiresAt).getTime() <= Date.now() : false;
   const isDataExhausted = config ? config.usedTraffic >= config.dataLimit : false;
   const isInactive = config ? config.active === false : false;
   const needsRenewal = isExpired || isDataExhausted || isInactive;
@@ -209,8 +210,10 @@ export default function Dashboard({ user }: { user: User }) {
             {/* Stats Row - Glass Tiles */}
             <div className="grid grid-cols-2 gap-6">
               <GlassCard className="p-8 flex flex-col items-center justify-center text-center space-y-3 border-white/5" intensity={0.05}>
-                <div className="text-5xl font-black tracking-tighter text-white/90 leading-none">{daysLeft(config.expiresAt)}</div>
-                <div className="text-xs font-bold text-white/30 uppercase tracking-[0.2em]">Days Remaining</div>
+                <div className="text-5xl font-black tracking-tighter text-white/90 leading-none">
+                  {daysLeft(config.expiresAt) === -1 ? '0' : daysLeft(config.expiresAt) === 0 ? '<24h' : daysLeft(config.expiresAt)}
+                </div>
+                <div className="text-xs font-bold text-white/30 uppercase tracking-[0.2em]">{daysLeft(config.expiresAt) === 0 ? 'Remaining' : 'Days Remaining'}</div>
               </GlassCard>
 
               <GlassCard className="p-8 flex flex-col items-center justify-center text-center space-y-3 border-white/5" intensity={0.05}>

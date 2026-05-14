@@ -12,7 +12,12 @@ export async function GET() {
   }
 
   const db = getDb();
-  const nodes = db.prepare("SELECT * FROM nodes ORDER BY createdAt DESC").all();
+  const nodes = db.prepare(`
+    SELECT n.*, 
+      IFNULL((SELECT SUM(totalUp + totalDown) FROM vpn_configs WHERE nodeId = n.id), 0) as assignedTraffic
+    FROM nodes n 
+    ORDER BY n.createdAt DESC
+  `).all();
   return NextResponse.json(nodes);
 }
 

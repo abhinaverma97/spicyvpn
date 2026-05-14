@@ -475,6 +475,7 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
                       <th className="px-6 py-3">Node Identity</th>
                       <th className="px-6 py-3 text-center">Status</th>
                       <th className="px-6 py-3">Load (CPU/RAM)</th>
+                      <th className="px-6 py-3">Bandwidth</th>
                       <th className="px-6 py-3 text-right">Assigned Users</th>
                       <th className="px-6 py-3 text-right pr-6">Manage</th>
                     </tr>
@@ -518,6 +519,12 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
                                   <div className="h-full bg-white/40" style={{ width: `${n.ramUsage || 0}%` }} />
                                 </div>
                               </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col gap-1">
+                              <span className="text-sm font-bold text-white/90">{fmt(n.assignedTraffic)}</span>
+                              <span className="text-[9px] text-white/30 uppercase font-bold">Total Handled</span>
                             </div>
                           </td>
                           <td className="px-6 py-4 text-right">

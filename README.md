@@ -49,7 +49,7 @@ The frontend serves as the centralized management console, utilizing a unified "
 ### **User Dashboard (`/dashboard`)**
 - **Dynamic Config Management:** Reads the user's specific `dataLimit` and `expiresAt` timestamps from the database. Calculates remaining days and gigabytes dynamically.
 - **Renewal Logic:** If a user exhausts their data limit or their time expires, the UI shifts states to allow them to "Renew Access Link," which interacts with `/api/vpn` to issue a fresh UUID and reset their limits.
-- **Client Guides:** Provides direct download links to the custom **SpicyVPN Desktop App** (v1.0.64+) and guides for Hiddify/Nekobox.
+- **Client Guides:** Provides direct download links to the custom **SpicyVPN Desktop App** (v1.0.67+) and guides for Hiddify/Nekobox.
 
 ### **Admin Console (`/admin`)**
 - **Live Fleet Monitoring:** Accurately calculates "Live Now" users. It determines this by scanning the database for any user whose `lastActive` timestamp was updated by the traffic tracker within the last 60 seconds.
@@ -61,6 +61,12 @@ The frontend serves as the centralized management console, utilizing a unified "
 ## 4. Backend Details (Data Plane & APIs)
 
 The backend logic is self-contained within the Next.js `/api` directory and standalone Node scripts.
+
+### **The Cloudflare Worker Bridge**
+To bypass domain-level blocking (common in restricted environments like colleges), we utilize a high-availability bridge:
+- **Endpoint:** `https://proud-union-953f.octd258.workers.dev/`
+- **Role:** Acts as a transparent proxy for the `/api/sub` endpoint. 
+- **Mechanism:** When the primary `spicypepper.app` domain is unreachable, the desktop client automatically fails over to this worker. The worker fetches the subscription data from the server's API and returns it with preserved headers, ensuring zero downtime for users on blocked networks.
 
 ### **Next.js API Routes**
 - **`/api/vpn`:** Handles the creation and renewal of identities. It enforces a strict 1-active-config-per-user rule. When generating, it sets `expiresAt` (now + 30 days) and `dataLimit` (50GB).

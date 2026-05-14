@@ -67,27 +67,34 @@ function fmt(bytes: number) {
   return (bytes / 1024).toFixed(0) + " KB";
 }
 
-export default function AdminDashboard({ users: initialUsers }: { users: User[] }) {
+export default function AdminDashboard({ users: initialUsers, initialNodes = [] }: { users: User[], initialNodes?: any[] }) {
   const [mounted, setMounted] = useState(false);
   const [users, setUsers] = useState<User[]>(initialUsers);
+  const [nodes, setNodes] = useState<any[]>(initialNodes);
   const [vps, setVps] = useState<VpsStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<"all" | "live" | "new" | "active">("all");
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"users" | "nodes">("users");
 
   async function refreshData() {
     setLoading(true);
     try {
-      const [vpsRes, usersRes] = await Promise.all([
+      const [vpsRes, usersRes, nodesRes] = await Promise.all([
         fetch("/api/admin/stats"),
-        fetch("/api/admin")
+        fetch("/api/admin"),
+        fetch("/api/admin/nodes")
       ]);
 
       if (vpsRes.ok) setVps(await vpsRes.json());
       if (usersRes.ok) {
         const data = await usersRes.json();
         setUsers(data);
+      }
+      if (nodesRes.ok) {
+        const data = await nodesRes.json();
+        setNodes(data);
       }
     } catch (err) {
       console.error("Refresh error:", err);
@@ -106,6 +113,16 @@ export default function AdminDashboard({ users: initialUsers }: { users: User[] 
   async function deleteUser(id: string) {
     await fetch("/api/admin", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: id }) });
     setUsers(u => u.filter(x => x.id !== id));
+    setConfirmId(null);
+  }
+
+  async function deleteNode(id: string) {
+    if (id === "node-1") {
+      alert("Cannot delete the master node.");
+      return;
+    }
+    await fetch("/api/admin/nodes", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    setNodes(n => n.filter(x => x.id !== id));
     setConfirmId(null);
   }
 
@@ -263,7 +280,22 @@ export default function AdminDashboard({ users: initialUsers }: { users: User[] 
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div>
               <h1 className="text-3xl font-black mb-2 tracking-tight uppercase">Admin Console</h1>
-              <p className="text-white/40 text-lg uppercase tracking-widest text-xs font-bold">Full Fleet Management & Node Telemetry</p>
+              <p className="text-white/40 text-lg uppercase tracking-widest text-xs font-bold mb-4">Full Fleet Management & Node Telemetry</p>
+              
+              <div className="flex gap-4 border-b border-white/10">
+                <button 
+                  onClick={() => setActiveTab("users")}
+                  className={`pb-2 text-sm font-bold uppercase tracking-widest transition-colors ${activeTab === 'users' ? 'border-b-2 border-emerald-400 text-emerald-400' : 'text-white/40 hover:text-white/70'}`}
+                >
+                  Registry
+                </button>
+                <button 
+                  onClick={() => setActiveTab("nodes")}
+                  className={`pb-2 text-sm font-bold uppercase tracking-widest transition-colors ${activeTab === 'nodes' ? 'border-b-2 border-emerald-400 text-emerald-400' : 'text-white/40 hover:text-white/70'}`}
+                >
+                  Nodes ({nodes.length})
+                </button>
+              </div>
             </div>
             
             {/* Engine Stats */}
@@ -306,127 +338,218 @@ export default function AdminDashboard({ users: initialUsers }: { users: User[] 
             </GlassCard>
           </div>
 
-          {/* User List */}
-          <GlassCard className="overflow-hidden border-white/5" intensity={0.08}>
-            <div className="p-6 border-b border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
-                <Users className="w-5 h-5 text-white/30" /> Users
-              </h2>
-              <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-                <select 
-                  value={filterType}
-                  onChange={e => setFilterType(e.target.value as any)}
-                  className="bg-black/40 border border-white/5 rounded-xl px-4 py-2.5 text-sm text-white/70 focus:border-white/20 outline-none transition-all cursor-pointer min-w-[160px]"
-                >
-                  <option value="all">All ({searchedUsers.length})</option>
-                  <option value="live">Live Now ({liveUsersCount})</option>
-                  <option value="active">Active Subs ({activeSubsCount})</option>
-                  <option value="new">Sort by Newest</option>
-                </select>
-                <div className="relative w-full sm:max-w-xs">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-                  <input 
-                    type="text"
-                    placeholder="Filter users..."
-                    className="w-full bg-black/40 border border-white/5 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white/70 focus:border-white/20 outline-none transition-all placeholder:text-white/10"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                  />
+          {/* Tab Content */}
+          {activeTab === "users" ? (
+            <GlassCard className="overflow-hidden border-white/5" intensity={0.08}>
+              <div className="p-6 border-b border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                  <Users className="w-5 h-5 text-white/30" /> Users
+                </h2>
+                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                  <select 
+                    value={filterType}
+                    onChange={e => setFilterType(e.target.value as any)}
+                    className="bg-black/40 border border-white/5 rounded-xl px-4 py-2.5 text-sm text-white/70 focus:border-white/20 outline-none transition-all cursor-pointer min-w-[160px]"
+                  >
+                    <option value="all">All ({searchedUsers.length})</option>
+                    <option value="live">Live Now ({liveUsersCount})</option>
+                    <option value="active">Active Subs ({activeSubsCount})</option>
+                    <option value="new">Sort by Newest</option>
+                  </select>
+                  <div className="relative w-full sm:max-w-xs">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+                    <input 
+                      type="text"
+                      placeholder="Filter users..."
+                      className="w-full bg-black/40 border border-white/5 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white/70 focus:border-white/20 outline-none transition-all placeholder:text-white/10"
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[900px]">
-                <thead className="bg-white/5 border-b border-white/5">
-                  <tr className="text-[10px] uppercase tracking-widest text-white/30 font-bold">
-                    <th className="px-6 py-3">Identity</th>
-                    <th className="px-6 py-3 text-center">Status</th>
-                    <th className="px-6 py-3">Data Consumed</th>
-                    <th className="px-6 py-3 text-right">Validity</th>
-                    <th className="px-6 py-3 text-right pr-6">Manage</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {sortedUsers.map((u, i) => {
-                    const isLive = vps?.liveUsers?.includes(u.token as string);
-                    const limit = u.dataLimit || (50 * 1024 * 1024 * 1024);
-                    const usagePct = (u.usedTraffic / limit) * 100;
-                    
-                    return (
-                      <tr key={i} className={`group transition-all duration-300 ${isLive ? 'bg-emerald-500/[0.02]' : 'hover:bg-white/[0.02]'}`}>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-lg border flex items-center justify-center font-bold text-sm shrink-0 transition-all duration-500 ${isLive ? 'bg-white border-white text-black scale-105 shadow-[0_0_15px_rgba(255,255,255,0.2)]' : 'bg-white/5 border-white/5 text-white/30'}`}>
-                              {u.name[0]}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-sm font-bold text-white/90 truncate">{u.name}</p>
-                              <p className="text-[10px] text-white/30 truncate font-mono">{u.email}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          {isLive ? (
-                            <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full">
-                              Live Now
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-transparent text-white/20 border-white/5 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full">
-                              Offline
-                            </Badge>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="w-40 space-y-1.5">
-                            <div className="flex justify-between text-[10px] font-bold">
-                              <span className={isLive ? "text-emerald-400" : "text-white/40"}>{fmt(u.usedTraffic)}</span>
-                              <span className="text-white/10 uppercase tracking-tighter italic">Cap {Math.floor(u.dataLimit / 1024 / 1024 / 1024)} GB</span>
-                            </div>
-                            <div className="h-1 bg-white/5 rounded-full overflow-hidden border border-white/5">
-                              <div 
-                                className={`h-full transition-all duration-1000 ${usagePct > 90 ? 'bg-red-500' : isLive ? 'bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-white/20'}`} 
-                                style={{ width: `${Math.min(100, usagePct)}%` }} 
-                              />
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="inline-flex flex-col items-end">
-                            <p className={`text-xs font-bold ${daysLeft(u.expiresAt) === -2 || (daysLeft(u.expiresAt) !== -1 && daysLeft(u.expiresAt) < 3) ? 'text-red-400' : 'text-white/70'}`}>
-                              {daysLeft(u.expiresAt) === -1 ? 'NO PLAN' : daysLeft(u.expiresAt) === -2 ? 'EXPIRED' : `${daysLeft(u.expiresAt)} DAYS`}
-                            </p>
-                            <p className="text-[9px] text-white/20 font-bold uppercase tracking-widest mt-0.5">Remaining</p>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-right pr-6">
-                          <div className="flex items-center justify-end">
-                            {confirmId === u.id ? (
-                              <div className="flex items-center gap-2 animate-in zoom-in-95">
-                                <button onClick={() => deleteUser(u.id)} className="text-[9px] font-bold text-red-400 bg-red-400/10 px-2 py-1 rounded-lg border border-red-500/20 hover:bg-red-500/20 transition-all uppercase tracking-widest">Revoke</button>
-                                <button onClick={() => setConfirmId(null)} className="text-[9px] font-bold text-white/30 uppercase px-2">Esc</button>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[900px]">
+                  <thead className="bg-white/5 border-b border-white/5">
+                    <tr className="text-[10px] uppercase tracking-widest text-white/30 font-bold">
+                      <th className="px-6 py-3">Identity</th>
+                      <th className="px-6 py-3 text-center">Status</th>
+                      <th className="px-6 py-3">Data Consumed</th>
+                      <th className="px-6 py-3 text-right">Validity</th>
+                      <th className="px-6 py-3 text-right pr-6">Manage</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {sortedUsers.map((u, i) => {
+                      const isLive = vps?.liveUsers?.includes(u.token as string);
+                      const limit = u.dataLimit || (50 * 1024 * 1024 * 1024);
+                      const usagePct = (u.usedTraffic / limit) * 100;
+                      
+                      return (
+                        <tr key={i} className={`group transition-all duration-300 ${isLive ? 'bg-emerald-500/[0.02]' : 'hover:bg-white/[0.02]'}`}>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-lg border flex items-center justify-center font-bold text-sm shrink-0 transition-all duration-500 ${isLive ? 'bg-white border-white text-black scale-105 shadow-[0_0_15px_rgba(255,255,255,0.2)]' : 'bg-white/5 border-white/5 text-white/30'}`}>
+                                {u.name[0]}
                               </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-bold text-white/90 truncate">{u.name}</p>
+                                <p className="text-[10px] text-white/30 truncate font-mono">{u.email}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            {isLive ? (
+                              <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full">
+                                Live Now
+                              </Badge>
                             ) : (
-                              <button onClick={() => setConfirmId(u.id)} className="p-2 text-white/20 hover:text-red-400 hover:bg-white/5 rounded-lg transition-all">
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                              <Badge className="bg-transparent text-white/20 border-white/5 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full">
+                                Offline
+                              </Badge>
                             )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            
-            {sortedUsers.length === 0 && (
-              <div className="p-24 text-center flex flex-col items-center gap-4 opacity-30">
-                <Shield className="w-12 h-12 mb-2" />
-                <p className="text-sm font-bold uppercase tracking-widest">Registry Search Empty</p>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="w-40 space-y-1.5">
+                              <div className="flex justify-between text-[10px] font-bold">
+                                <span className={isLive ? "text-emerald-400" : "text-white/40"}>{fmt(u.usedTraffic)}</span>
+                                <span className="text-white/10 uppercase tracking-tighter italic">Cap {Math.floor(u.dataLimit / 1024 / 1024 / 1024)} GB</span>
+                              </div>
+                              <div className="h-1 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                                <div 
+                                  className={`h-full transition-all duration-1000 ${usagePct > 90 ? 'bg-red-500' : isLive ? 'bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-white/20'}`} 
+                                  style={{ width: `${Math.min(100, usagePct)}%` }} 
+                                />
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="inline-flex flex-col items-end">
+                              <p className={`text-xs font-bold ${daysLeft(u.expiresAt) === -2 || (daysLeft(u.expiresAt) !== -1 && daysLeft(u.expiresAt) < 3) ? 'text-red-400' : 'text-white/70'}`}>
+                                {daysLeft(u.expiresAt) === -1 ? 'NO PLAN' : daysLeft(u.expiresAt) === -2 ? 'EXPIRED' : daysLeft(u.expiresAt) === 0 ? '< 24 HOURS' : `${daysLeft(u.expiresAt)} DAYS`}
+                              </p>
+                              <p className="text-[9px] text-white/20 font-bold uppercase tracking-widest mt-0.5">Remaining</p>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-right pr-6">
+                            <div className="flex items-center justify-end">
+                              {confirmId === u.id ? (
+                                <div className="flex items-center gap-2 animate-in zoom-in-95">
+                                  <button onClick={() => deleteUser(u.id)} className="text-[9px] font-bold text-red-400 bg-red-400/10 px-2 py-1 rounded-lg border border-red-500/20 hover:bg-red-500/20 transition-all uppercase tracking-widest">Revoke</button>
+                                  <button onClick={() => setConfirmId(null)} className="text-[9px] font-bold text-white/30 uppercase px-2">Esc</button>
+                                </div>
+                              ) : (
+                                <button onClick={() => setConfirmId(u.id)} className="p-2 text-white/20 hover:text-red-400 hover:bg-white/5 rounded-lg transition-all">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </GlassCard>
+              
+              {sortedUsers.length === 0 && (
+                <div className="p-24 text-center flex flex-col items-center gap-4 opacity-30">
+                  <Shield className="w-12 h-12 mb-2" />
+                  <p className="text-sm font-bold uppercase tracking-widest">Registry Search Empty</p>
+                </div>
+              )}
+            </GlassCard>
+          ) : (
+            <GlassCard className="overflow-hidden border-white/5" intensity={0.08}>
+              <div className="p-6 border-b border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                  <Monitor className="w-5 h-5 text-white/30" /> Active Nodes
+                </h2>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[900px]">
+                  <thead className="bg-white/5 border-b border-white/5">
+                    <tr className="text-[10px] uppercase tracking-widest text-white/30 font-bold">
+                      <th className="px-6 py-3">Node Identity</th>
+                      <th className="px-6 py-3 text-center">Status</th>
+                      <th className="px-6 py-3">Load (CPU/RAM)</th>
+                      <th className="px-6 py-3 text-right">Assigned Users</th>
+                      <th className="px-6 py-3 text-right pr-6">Manage</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {nodes.map((n, i) => {
+                      const isNodeLive = n.status === 'active' && ((Date.now() / 1000) - n.lastHeartbeat) < 120;
+                      return (
+                        <tr key={i} className="hover:bg-white/[0.02] transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-white/90 truncate flex items-center gap-2">
+                                {n.name}
+                                {n.id === 'node-1' && <Badge className="bg-blue-500/10 text-blue-400 text-[8px] uppercase px-1.5 py-0">Master</Badge>}
+                              </p>
+                              <p className="text-[10px] text-white/30 truncate font-mono">{n.ip}</p>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            {isNodeLive ? (
+                              <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full">
+                                Online
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-red-500/10 text-red-400 border-red-500/20 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full">
+                                Offline
+                              </Badge>
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-4">
+                              <div className="flex flex-col gap-1 w-20">
+                                <span className="text-[9px] text-white/30 uppercase font-bold">CPU {Math.round(n.cpuUsage || 0)}%</span>
+                                <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                                  <div className="h-full bg-white/40" style={{ width: `${n.cpuUsage || 0}%` }} />
+                                </div>
+                              </div>
+                              <div className="flex flex-col gap-1 w-20">
+                                <span className="text-[9px] text-white/30 uppercase font-bold">RAM {Math.round(n.ramUsage || 0)}%</span>
+                                <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                                  <div className="h-full bg-white/40" style={{ width: `${n.ramUsage || 0}%` }} />
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="inline-flex flex-col items-end">
+                              <p className="text-sm font-bold text-white/90">{n.liveUsers || 0}</p>
+                              <p className="text-[9px] text-white/20 font-bold uppercase tracking-widest">Live</p>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-right pr-6">
+                            {n.id !== 'node-1' && (
+                              <div className="flex items-center justify-end">
+                                {confirmId === n.id ? (
+                                  <div className="flex items-center gap-2 animate-in zoom-in-95">
+                                    <button onClick={() => deleteNode(n.id)} className="text-[9px] font-bold text-red-400 bg-red-400/10 px-2 py-1 rounded-lg border border-red-500/20 hover:bg-red-500/20 transition-all uppercase tracking-widest">Delete</button>
+                                    <button onClick={() => setConfirmId(null)} className="text-[9px] font-bold text-white/30 uppercase px-2">Esc</button>
+                                  </div>
+                                ) : (
+                                  <button onClick={() => setConfirmId(n.id)} className="p-2 text-white/20 hover:text-red-400 hover:bg-white/5 rounded-lg transition-all">
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </GlassCard>
+          )}
         </main>
         
         <Footer />

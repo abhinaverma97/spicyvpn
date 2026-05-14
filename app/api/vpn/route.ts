@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { getDb } from "@/lib/db";
+import { getDb, getBestNode } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { randomUUID, randomBytes } from "crypto";
 
@@ -15,8 +15,10 @@ export async function GET() {
   
   const rows = db.prepare(`
     SELECT vc.*, 
-      (SELECT COUNT(*) FROM token_devices td WHERE td.token = vc.token) as deviceCount
+      (SELECT COUNT(*) FROM token_devices td WHERE td.token = vc.token) as deviceCount,
+      n.ip as nodeIp
     FROM vpn_configs vc 
+    LEFT JOIN nodes n ON vc.nodeId = n.id
     WHERE vc.userId = ? 
     ORDER BY vc.createdAt DESC
   `).all(session.user.id) as any[];
@@ -31,6 +33,7 @@ export async function GET() {
     usedTraffic: (row.totalUp || 0) + (row.totalDown || 0),
     dataLimit: row.dataLimit || (50 * 1024 * 1024 * 1024),
     deviceCount: row.deviceCount || 0,
+    nodeIp: row.nodeIp || "140.245.13.64",
   })));
 }
 
@@ -54,6 +57,10 @@ export async function POST() {
     }
   }
 
+  // Load balancing: pick the best node
+  const bestNode = getBestNode();
+  const nodeId = bestNode ? bestNode.id : "node-1";
+
   const id = randomUUID();
   const uuid = randomUUID(); // Required by existing NOT NULL schema constraint
   const token = generateToken();
@@ -62,9 +69,9 @@ export async function POST() {
   const monthStr = new Date().toISOString().substring(0, 7);
 
   db.prepare(`
-    INSERT INTO vpn_configs (id, userId, uuid, token, expiresAt, active, createdAt, dataLimit, lastDataResetMonth)
-    VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)
-  `).run(id, session.user.id, uuid, token, expiresAt, now, dataLimit, monthStr);
+    INSERT INTO vpn_configs (id, userId, uuid, token, expiresAt, active, createdAt, dataLimit, lastDataResetMonth, nodeId)
+    VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+  `).run(id, session.user.id, uuid, token, expiresAt, now, dataLimit, monthStr, nodeId);
 
   return NextResponse.json({
     id,
@@ -75,5 +82,6 @@ export async function POST() {
     usedTraffic: 0,
     dataLimit,
     deviceCount: 0,
+    nodeIp: bestNode ? bestNode.ip : "140.245.13.64",
   });
 }

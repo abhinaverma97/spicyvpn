@@ -89,6 +89,9 @@ function initSchema(db: Database.Database) {
       status TEXT DEFAULT 'active',
       lastHeartbeat INTEGER DEFAULT 0,
       lastTraffic TEXT DEFAULT '{}',
+      cpuUsage REAL DEFAULT 0,
+      ramUsage REAL DEFAULT 0,
+      liveUsers INTEGER DEFAULT 0,
       createdAt INTEGER DEFAULT (unixepoch())
     );
 
@@ -131,6 +134,15 @@ function initSchema(db: Database.Database) {
     if (!nodeColumns.includes("lastTraffic")) {
       db.exec("ALTER TABLE nodes ADD COLUMN lastTraffic TEXT DEFAULT '{}';");
     }
+    if (!nodeColumns.includes("cpuUsage")) {
+      db.exec("ALTER TABLE nodes ADD COLUMN cpuUsage REAL DEFAULT 0;");
+    }
+    if (!nodeColumns.includes("ramUsage")) {
+      db.exec("ALTER TABLE nodes ADD COLUMN ramUsage REAL DEFAULT 0;");
+    }
+    if (!nodeColumns.includes("liveUsers")) {
+      db.exec("ALTER TABLE nodes ADD COLUMN liveUsers INTEGER DEFAULT 0;");
+    }
 
     // Insert default node if nodes table is empty
     const nodeCount = db.prepare("SELECT COUNT(*) as count FROM nodes").get() as { count: number };
@@ -143,4 +155,26 @@ function initSchema(db: Database.Database) {
   } catch (error) {
     console.error("Migration error:", error);
   }
+}
+
+export function getBestNode(): any {
+  const db = getDb();
+  const now = Math.floor(Date.now() / 1000);
+  // A node is considered offline if it hasn't checked in for 2 minutes
+  const node = db.prepare(`
+    SELECT * FROM nodes 
+    WHERE status = 'active' AND lastHeartbeat > ? 
+    ORDER BY liveUsers ASC 
+    LIMIT 1
+  `).get(now - 120);
+
+  if (node) return node;
+
+  // Fallback to any active node if no heartbeat is fresh
+  return db.prepare(`
+    SELECT * FROM nodes 
+    WHERE status = 'active' 
+    ORDER BY liveUsers ASC 
+    LIMIT 1
+  `).get();
 }

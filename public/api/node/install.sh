@@ -115,8 +115,9 @@ while true; do
     fi
 
     # 2. Collect Stats
-    CPU=$(top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1}')
-    RAM=$(free | grep Mem | awk '{print $3/$2 * 100.0}')
+    # Reading from /proc/stat is much more reliable across different Linux distros than parsing top output
+    CPU=$(cat /proc/stat | grep '^cpu ' | awk '{printf "%.1f", ($2+$4)*100/($2+$4+$5)}')
+    RAM=$(free | grep Mem | awk '{printf "%.1f", $3/$2 * 100.0}')
     
     # 3. Report back
     curl -s -X POST -H "Authorization: Bearer $KEY" \

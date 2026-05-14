@@ -3,6 +3,7 @@ import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import os from 'os';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -137,6 +138,25 @@ async function syncAndTrack() {
         currentKnownTokens.delete(token);
       }
     }
+
+    // 6. Update Master Node Telemetry (Heartbeat)
+    const cpus = os.cpus();
+    const load = os.loadavg();
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedMem = totalMem - freeMem;
+    const cpuPct = Math.round(load[0] * 100 / cpus.length);
+    const ramPct = Math.round((usedMem / totalMem) * 100);
+    
+    // Accurate Live Users check matching the Admin Dashboard logic (active within last 60s)
+    const liveUsersQuery = db.prepare(`SELECT COUNT(*) as count FROM vpn_configs WHERE lastActive >= ?`).get(now - 60);
+    const liveUsersCount = liveUsersQuery ? liveUsersQuery.count : 0;
+
+    db.prepare(`
+      UPDATE nodes 
+      SET lastHeartbeat = ?, cpuUsage = ?, ramUsage = ?, liveUsers = ?, status = 'active'
+      WHERE id = 'node-1'
+    `).run(now, cpuPct, ramPct, liveUsersCount);
 
     previousStats = currentBatch;
   } catch (error) {

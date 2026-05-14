@@ -115,8 +115,14 @@ while true; do
     fi
 
     # 2. Collect Stats
-    # Reading from /proc/stat is much more reliable across different Linux distros than parsing top output
-    CPU=$(cat /proc/stat | grep '^cpu ' | awk '{printf "%.1f", ($2+$4)*100/($2+$4+$5)}')
+    # We calculate CPU usage by taking a 1-second delta from /proc/stat to get the true current load
+    CPU=$(awk -v delay=1 'BEGIN {
+        while (getline < "/proc/stat") { if ($1 == "cpu") { idle1 = $5 + $6; total1 = $2 + $3 + $4 + $5 + $6 + $7 + $8 + $9; break; } }
+        close("/proc/stat");
+        system("sleep " delay);
+        while (getline < "/proc/stat") { if ($1 == "cpu") { idle2 = $5 + $6; total2 = $2 + $3 + $4 + $5 + $6 + $7 + $8 + $9; break; } }
+        if (total2 - total1 > 0) printf "%.1f\n", 100 * (1 - (idle2 - idle1) / (total2 - total1)); else print "0.0";
+    }')
     RAM=$(free | grep Mem | awk '{printf "%.1f", $3/$2 * 100.0}')
     
     # 3. Report back

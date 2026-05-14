@@ -125,10 +125,15 @@ while true; do
     }')
     RAM=$(free | grep Mem | awk '{printf "%.1f", $3/$2 * 100.0}')
     
-    # 3. Report back
+    # 3. Collect Traffic Stats from Xray
+    XRAY_STATS=$(xray api statsquery --server=$XRAY_API 2>/dev/null || echo '{"stat":[]}')
+    TRAFFIC_STATS=$(echo "$XRAY_STATS" | jq -c 'if .stat == null then {} else reduce .stat[] as $item ({}; ($item.name | split(">>>")) as $parts | if $parts[0] == "user" then .[$parts[1]][$parts[3]] = ($item.value | tonumber) else . end) end')
+    if [ -z "$TRAFFIC_STATS" ]; then TRAFFIC_STATS="{}"; fi
+    
+    # 4. Report back
     curl -s -X POST -H "Authorization: Bearer $KEY" \
          -H "Content-Type: application/json" \
-         -d "{\"cpuUsage\": $CPU, \"ramUsage\": $RAM, \"liveUsers\": 0, \"trafficStats\": {}}" \
+         -d "{\"cpuUsage\": $CPU, \"ramUsage\": $RAM, \"trafficStats\": $TRAFFIC_STATS}" \
          "$MASTER/api/node/report"
 
     sleep 10

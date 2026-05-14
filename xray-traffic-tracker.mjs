@@ -149,7 +149,8 @@ async function syncAndTrack() {
     const ramPct = Math.round((usedMem / totalMem) * 100);
     
     // Accurate Live Users check matching the Admin Dashboard logic (active within last 60s)
-    const liveUsersQuery = db.prepare(`SELECT COUNT(*) as count FROM vpn_configs WHERE lastActive >= ?`).get(now - 60);
+    // Only count users explicitly assigned to the master node (or null from legacy configs)
+    const liveUsersQuery = db.prepare(`SELECT COUNT(*) as count FROM vpn_configs WHERE lastActive >= ? AND (nodeId = 'node-1' OR nodeId IS NULL)`).get(now - 60);
     const liveUsersCount = liveUsersQuery ? liveUsersQuery.count : 0;
 
     db.prepare(`

@@ -116,13 +116,19 @@ while true; do
 
     # 2. Collect Stats
     # We calculate CPU usage by taking a 1-second delta from /proc/stat to get the true current load
-    CPU=$(awk -v delay=1 'BEGIN {
-        while (getline < "/proc/stat") { if ($1 == "cpu") { idle1 = $5 + $6; total1 = $2 + $3 + $4 + $5 + $6 + $7 + $8 + $9; break; } }
-        close("/proc/stat");
-        system("sleep " delay);
-        while (getline < "/proc/stat") { if ($1 == "cpu") { idle2 = $5 + $6; total2 = $2 + $3 + $4 + $5 + $6 + $7 + $8 + $9; break; } }
-        if (total2 - total1 > 0) printf "%.1f\n", 100 * (1 - (idle2 - idle1) / (total2 - total1)); else print "0.0";
-    }')
+    read cpu user nice system idle iowait irq softirq steal guest < /proc/stat
+    sleep 1
+    read cpu user2 nice2 system2 idle2 iowait2 irq2 softirq2 steal2 guest2 < /proc/stat
+    prev_idle=$((idle + iowait))
+    idle_total=$((idle2 + iowait2))
+    prev_non_idle=$((user + nice + system + irq + softirq + steal))
+    non_idle=$((user2 + nice2 + system2 + irq2 + softirq2 + steal2))
+    prev_total=$((prev_idle + prev_non_idle))
+    total=$((idle_total + non_idle))
+    total_diff=$((total - prev_total))
+    idle_diff=$((idle_total - prev_idle))
+    CPU=$(awk -v t=$total_diff -v i=$idle_diff 'BEGIN { if(t>0) printf "%.1f\n", (t-i)*100/t; else print "0.0" }')
+    
     RAM=$(free | grep Mem | awk '{printf "%.1f", $3/$2 * 100.0}')
     
     # 3. Collect Traffic Stats from Xray

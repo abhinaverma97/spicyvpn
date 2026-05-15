@@ -126,6 +126,23 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
     setConfirmId(null);
   }
 
+  async function toggleNodeStatus(id: string, currentStatus: string) {
+    if (id === "node-1") {
+      alert("Cannot disable the master node.");
+      return;
+    }
+    const newStatus = currentStatus === 'active' ? 'disabled' : 'active';
+    const res = await fetch("/api/admin/nodes", { 
+      method: "PATCH", 
+      headers: { "Content-Type": "application/json" }, 
+      body: JSON.stringify({ id, status: newStatus }) 
+    });
+    
+    if (res.ok) {
+      setNodes(n => n.map(x => x.id === id ? { ...x, status: newStatus } : x));
+    }
+  }
+
   async function addNode() {
     setLoading(true);
     try {
@@ -495,7 +512,11 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
                             </div>
                           </td>
                           <td className="px-6 py-4 text-center">
-                            {isNodeLive ? (
+                            {n.status === 'disabled' ? (
+                              <Badge className="bg-yellow-500/10 text-yellow-400 border-yellow-500/20 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full">
+                                Disabled
+                              </Badge>
+                            ) : isNodeLive ? (
                               <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full">
                                 Online
                               </Badge>
@@ -535,7 +556,13 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
                           </td>
                           <td className="px-6 py-4 text-right pr-6">
                             {n.id !== 'node-1' && (
-                              <div className="flex items-center justify-end">
+                              <div className="flex items-center justify-end gap-2">
+                                <button 
+                                  onClick={() => toggleNodeStatus(n.id, n.status)} 
+                                  className="text-[9px] font-bold text-white/40 hover:text-white bg-white/5 px-2 py-1 rounded-lg border border-white/5 hover:bg-white/10 transition-all uppercase tracking-widest"
+                                >
+                                  {n.status === 'active' ? 'Disable' : 'Enable'}
+                                </button>
                                 {confirmId === n.id ? (
                                   <div className="flex items-center gap-2 animate-in zoom-in-95">
                                     <button onClick={() => deleteNode(n.id)} className="text-[9px] font-bold text-red-400 bg-red-400/10 px-2 py-1 rounded-lg border border-red-500/20 hover:bg-red-500/20 transition-all uppercase tracking-widest">Delete</button>

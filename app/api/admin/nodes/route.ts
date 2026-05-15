@@ -93,6 +93,27 @@ export async function POST(req: Request) {
   });
 }
 
+export async function PATCH(req: Request) {
+  const session = await auth();
+  if (session?.user?.email !== ADMIN_EMAIL) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const { id, status } = await req.json();
+    if (!id || !status) return NextResponse.json({ error: "Node ID and status required" }, { status: 400 });
+    if (id === "node-1") return NextResponse.json({ error: "Cannot modify master node status" }, { status: 400 });
+
+    const db = getDb();
+    db.prepare("UPDATE nodes SET status = ? WHERE id = ?").run(status, id);
+    
+    return NextResponse.json({ success: true, status });
+  } catch (error) {
+    console.error("Node Update Error:", error);
+    return NextResponse.json({ error: "Update failed" }, { status: 500 });
+  }
+}
+
 export async function DELETE(req: Request) {
   const session = await auth();
   if (session?.user?.email !== ADMIN_EMAIL) {

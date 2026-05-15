@@ -104,14 +104,52 @@ MASTER=$(cat /etc/spicyvpn/master)
 XRAY_API="127.0.0.1:10085"
 
 previous_stats="{}"
+KNOWN_TOKENS=()
 
 while true; do
     # 1. Sync Users
-    SYNC=$(curl -s -H "Authorization: Bearer $KEY" "$MASTER/api/node/sync")
+    SYNC=$(curl -s -f -H "Authorization: Bearer $KEY" "$MASTER/api/node/sync")
     if [ $? -eq 0 ]; then
-        USERS=$(echo "$SYNC" | jq -r '.users[] | .uuid + " " + .token')
-        # Here we would normally use 'xray api adu/rmu' to sync
-        # For this script, we'll just log and assume Xray is updated via a sidecar or direct API call
+        ACTIVE_TOKENS=$(echo "$SYNC" | jq -r '.users[] | .token')
+        
+        # Add new users
+        for user_json in $(echo "$SYNC" | jq -c '.users[]'); do
+            TOKEN=$(echo "$user_json" | jq -r '.token')
+            UUID=$(echo "$user_json" | jq -r '.uuid')
+            
+            # Use a more compatible way to check if token exists in KNOWN_TOKENS array
+            exists=0
+            for k in "${KNOWN_TOKENS[@]}"; do [[ "$k" == "$TOKEN" ]] && exists=1 && break; done
+            
+            if [ $exists -eq 0 ]; then
+                echo "[SYNC] Adding user: $TOKEN"
+                cat <<EOF > /tmp/add_user.json
+{
+  "inbounds": [{
+    "port": 8444, "protocol": "vless", "tag": "vless-grpc",
+    "settings": { "clients": [{"id": "$UUID", "email": "$TOKEN"}] }
+  }]
+}
+EOF
+                xray api adu --server=$XRAY_API /tmp/add_user.json &>/dev/null
+                KNOWN_TOKENS+=("$TOKEN")
+            fi
+        done
+
+        # Remove users no longer in the master list
+        for i in "${!KNOWN_TOKENS[@]}"; do
+            TOKEN="${KNOWN_TOKENS[$i]}"
+            exists=0
+            for a in ${ACTIVE_TOKENS[@]}; do [[ "$a" == "$TOKEN" ]] && exists=1 && break; done
+            
+            if [ $exists -eq 0 ]; then
+                echo "[SYNC] Removing user: $TOKEN"
+                xray api rmu --server=$XRAY_API -tag=vless-grpc "$TOKEN" &>/dev/null
+                unset 'KNOWN_TOKENS[$i]'
+            fi
+        done
+        # Re-index array
+        KNOWN_TOKENS=("${KNOWN_TOKENS[@]}")
     fi
 
     # 2. Collect Stats

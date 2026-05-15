@@ -24,7 +24,7 @@ export async function GET(req: Request) {
       SELECT uuid, token, expiresAt, dataLimit, totalUp, totalDown 
       FROM vpn_configs 
       WHERE nodeId = ? AND active = 1 AND expiresAt > ? AND (totalUp + totalDown) < dataLimit
-    `).all(node.id) as any[];
+    `).all(node.id, now) as any[];
 
     return NextResponse.json({ 
       nodeName: node.name,

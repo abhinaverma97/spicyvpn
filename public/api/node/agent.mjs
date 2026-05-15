@@ -1,7 +1,6 @@
 import { execSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
-import http from 'https';
 
 const KEY_FILE = '/etc/spicyvpn/key';
 const MASTER_FILE = '/etc/spicyvpn/master';
@@ -16,39 +15,45 @@ if (!fs.existsSync(KEY_FILE) || !fs.existsSync(MASTER_FILE)) {
 const KEY = fs.readFileSync(KEY_FILE, 'utf8').trim();
 const MASTER = fs.readFileSync(MASTER_FILE, 'utf8').trim();
 
-// Ensure state file exists
 if (!fs.existsSync(STATE_FILE)) fs.writeFileSync(STATE_FILE, '');
 
+let lastCpuStats = null;
+
 function getStats() {
-    const load = os.loadavg()[0];
-    const cores = os.cpus().length;
-    const cpu = ((load / cores) * 100).toFixed(1);
-    const ram = (((os.totalmem() - os.freemem()) / os.totalmem()) * 100).toFixed(1);
-    return { cpu, ram };
+    try {
+        const stats = fs.readFileSync('/proc/stat', 'utf8').split('\n')[0].split(/\s+/).slice(1).map(Number);
+        const idle = stats[3] + stats[4]; // idle + iowait
+        const total = stats.reduce((a, b) => a + b, 0);
+
+        let cpu = "0.0";
+        if (lastCpuStats) {
+            const idleDiff = idle - lastCpuStats.idle;
+            const totalDiff = total - lastCpuStats.total;
+            if (totalDiff > 0) {
+                cpu = Math.min(100, Math.max(0, (1 - (idleDiff / totalDiff)) * 100)).toFixed(1);
+            }
+        }
+        lastCpuStats = { idle, total };
+
+        const ram = (((os.totalmem() - os.freemem()) / os.totalmem()) * 100).toFixed(1);
+        return { cpu, ram };
+    } catch (e) {
+        return { cpu: "0.0", ram: "0.0" };
+    }
 }
 
 async function fetchMaster(path, method = 'GET', body = null) {
-    return new Promise((resolve, reject) => {
-        const url = new URL(path, MASTER);
-        const options = {
-            method,
-            headers: {
-                'Authorization': `Bearer ${KEY}`,
-                'Content-Type': 'application/json'
-            }
-        };
-        const req = http.request(url, options, (res) => {
-            let data = '';
-            res.on('data', (chunk) => data += chunk);
-            res.on('end', () => {
-                if (res.statusCode >= 400) reject(new Error(`HTTP ${res.statusCode}`));
-                else resolve(JSON.parse(data));
-            });
-        });
-        req.on('error', reject);
-        if (body) req.write(JSON.stringify(body));
-        req.end();
+    const url = MASTER.endsWith('/') ? MASTER.slice(0, -1) + path : MASTER + path;
+    const res = await fetch(url, {
+        method,
+        headers: {
+            'Authorization': `Bearer ${KEY}`,
+            'Content-Type': 'application/json'
+        },
+        body: body ? JSON.stringify(body) : null
     });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
 }
 
 function getXrayStats() {
@@ -74,15 +79,14 @@ function getXrayStats() {
 
 async function sync() {
     try {
-        // 1. Fetch desired state from Master
+        console.log(`[${new Date().toISOString()}] Pulse...`);
+        
+        // 1. Sync
         const data = await fetchMaster('/api/node/sync');
         const masterUsers = data.users || [];
         const masterTokens = masterUsers.map(u => u.token);
-
-        // 2. Read local state
         const localTokens = fs.readFileSync(STATE_FILE, 'utf8').split('\n').filter(Boolean);
         
-        // 3. Add new users
         for (const user of masterUsers) {
             if (!localTokens.includes(user.token)) {
                 console.log(`[SYNC] Adding user: ${user.token}`);
@@ -97,14 +101,11 @@ async function sync() {
                 try {
                     execSync(`xray api adu --server=${XRAY_API} ${tmpFile}`);
                     fs.appendFileSync(STATE_FILE, user.token + '\n');
-                } catch (e) {
-                    console.error(`Failed to add ${user.token}`);
-                }
+                } catch (e) { console.error(`Add fail: ${user.token}`); }
                 if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
             }
         }
 
-        // 4. Remove old users
         for (const token of localTokens) {
             if (!masterTokens.includes(token)) {
                 console.log(`[SYNC] Removing user: ${token}`);
@@ -112,13 +113,11 @@ async function sync() {
                     execSync(`xray api rmu --server=${XRAY_API} -tag=vless-grpc "${token}"`);
                     const newState = fs.readFileSync(STATE_FILE, 'utf8').split('\n').filter(t => t !== token).join('\n');
                     fs.writeFileSync(STATE_FILE, newState + (newState ? '\n' : ''));
-                } catch (e) {
-                    console.error(`Failed to remove ${token}`);
-                }
+                } catch (e) { console.error(`Rem fail: ${token}`); }
             }
         }
 
-        // 5. Report Stats
+        // 2. Report
         const { cpu, ram } = getStats();
         const trafficStats = getXrayStats();
         await fetchMaster('/api/node/report', 'POST', {
@@ -128,7 +127,7 @@ async function sync() {
         });
 
     } catch (err) {
-        console.error('Loop error:', err.message);
+        console.error('Pulse Error:', err.message);
     }
 }
 

@@ -20,14 +20,16 @@ const MASTER = fs.readFileSync(MASTER_FILE, 'utf8').trim();
 if (!fs.existsSync(STATE_FILE)) fs.writeFileSync(STATE_FILE, '');
 
 let lastCpuStats = null;
-
 function getStats() {
     try {
         const content = fs.readFileSync('/proc/stat', 'utf8');
-        const line = content.split('\n').find(l => l.startsWith('cpu '));
+        const line = content.split('\n').find(l => l.startsWith('cpu'));
         if (!line) return { cpu: "0.0", ram: "0.0" };
-        
-        const stats = line.trim().split(/\s+/).slice(1).map(Number);
+
+        const stats = line.split(/\s+/)
+            .filter(x => x.length > 0 && !isNaN(x))
+            .map(Number);
+
         const idle = stats[3] + stats[4]; 
         const total = stats.reduce((a, b) => a + b, 0);
 
@@ -42,11 +44,12 @@ function getStats() {
         }
         lastCpuStats = { idle, total };
 
-        const totalMem = os.totalmem();
-        const ram = (((totalMem - os.freemem()) / totalMem) * 100).toFixed(1);
+        const ram = (((os.totalmem() - os.freemem()) / os.totalmem()) * 100).toFixed(1);
         return { cpu, ram };
     } catch (e) {
-        console.error('Stats Error:', e.message);
+        return { cpu: "0.0", ram: "0.0" };
+    }
+}
         return { cpu: "0.0", ram: "0.0" };
     }
 }

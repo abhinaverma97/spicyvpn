@@ -95,6 +95,7 @@ cat <<EOF > /usr/local/etc/xray/config.json
                 "network": "grpc", 
                 "security": "tls",
                 "tlsSettings": {
+                    "alpn": ["h2"],
                     "certificates": [{
                         "certificateFile": "/usr/local/etc/xray/certs/cert.pem",
                         "keyFile": "/usr/local/etc/xray/certs/key.pem"

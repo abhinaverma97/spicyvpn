@@ -49,7 +49,7 @@ export async function GET(req: Request) {
     // If it's a remote node, we must allow insecure TLS because they use self-signed certificates.
     const userName = config.name ? config.name.split(" ")[0] : "User";
     const allowInsecure = targetNodeId === 'node-1' ? '' : '&allowInsecure=1';
-    const vlessLink = `vless://${config.uuid}@${targetNodeIp}:8444?security=tls&sni=spicypepper.app&type=grpc&serviceName=spicypepper-grpc${allowInsecure}#SpicyVPN-${userName}`;
+    const vlessLink = `vless://${config.uuid}@${targetNodeIp}:8444?security=tls&sni=spicypepper.app&alpn=h2,http/1.1&fp=chrome&type=grpc&serviceName=spicypepper-grpc${allowInsecure}#SpicyVPN-${userName}`;
     const base64Data = Buffer.from(vlessLink).toString('base64');
 
     return new Response(base64Data, {

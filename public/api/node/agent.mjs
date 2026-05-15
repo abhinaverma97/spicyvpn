@@ -7,8 +7,10 @@ const MASTER_FILE = '/etc/spicyvpn/master';
 const STATE_FILE = '/etc/spicyvpn/state';
 const XRAY_API = '127.0.0.1:10085';
 
+console.log('SpicyAgent High-Performance Daemon starting...');
+
 if (!fs.existsSync(KEY_FILE) || !fs.existsSync(MASTER_FILE)) {
-    console.error('Missing configuration files.');
+    console.error('Fatal: Missing configuration files in /etc/spicyvpn/');
     process.exit(1);
 }
 
@@ -21,8 +23,12 @@ let lastCpuStats = null;
 
 function getStats() {
     try {
-        const stats = fs.readFileSync('/proc/stat', 'utf8').split('\n')[0].split(/\s+/).slice(1).map(Number);
-        const idle = stats[3] + stats[4]; // idle + iowait
+        const content = fs.readFileSync('/proc/stat', 'utf8');
+        const line = content.split('\n').find(l => l.startsWith('cpu '));
+        if (!line) return { cpu: "0.0", ram: "0.0" };
+        
+        const stats = line.trim().split(/\s+/).slice(1).map(Number);
+        const idle = stats[3] + stats[4]; 
         const total = stats.reduce((a, b) => a + b, 0);
 
         let cpu = "0.0";
@@ -30,14 +36,17 @@ function getStats() {
             const idleDiff = idle - lastCpuStats.idle;
             const totalDiff = total - lastCpuStats.total;
             if (totalDiff > 0) {
-                cpu = Math.min(100, Math.max(0, (1 - (idleDiff / totalDiff)) * 100)).toFixed(1);
+                const usage = (1 - (idleDiff / totalDiff)) * 100;
+                cpu = Math.min(100, Math.max(0, usage)).toFixed(1);
             }
         }
         lastCpuStats = { idle, total };
 
-        const ram = (((os.totalmem() - os.freemem()) / os.totalmem()) * 100).toFixed(1);
+        const totalMem = os.totalmem();
+        const ram = (((totalMem - os.freemem()) / totalMem) * 100).toFixed(1);
         return { cpu, ram };
     } catch (e) {
+        console.error('Stats Error:', e.message);
         return { cpu: "0.0", ram: "0.0" };
     }
 }
@@ -48,17 +57,24 @@ async function fetchMaster(path, method = 'GET', body = null) {
         method,
         headers: {
             'Authorization': `Bearer ${KEY}`,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'User-Agent': 'SpicyAgent/1.0'
         },
-        body: body ? JSON.stringify(body) : null
+        body: body ? JSON.stringify(body) : null,
+        // Reliability: On some VPS nodes, we need to bypass strict SSL for internal node-to-master reporting
+        // but since we are using native fetch, we'll stick to standard first.
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    
+    if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Master responded with ${res.status}: ${text.slice(0, 50)}`);
+    }
     return res.json();
 }
 
 function getXrayStats() {
     try {
-        const output = execSync(`xray api statsquery --server=${XRAY_API}`).toString();
+        const output = execSync(`xray api statsquery --server=${XRAY_API}`, { timeout: 2000 }).toString();
         const data = JSON.parse(output);
         if (!data.stat) return {};
         const stats = {};
@@ -79,8 +95,6 @@ function getXrayStats() {
 
 async function sync() {
     try {
-        console.log(`[${new Date().toISOString()}] Pulse...`);
-        
         // 1. Sync
         const data = await fetchMaster('/api/node/sync');
         const masterUsers = data.users || [];
@@ -101,7 +115,7 @@ async function sync() {
                 try {
                     execSync(`xray api adu --server=${XRAY_API} ${tmpFile}`);
                     fs.appendFileSync(STATE_FILE, user.token + '\n');
-                } catch (e) { console.error(`Add fail: ${user.token}`); }
+                } catch (e) { console.error(`Add failed for ${user.token}`); }
                 if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
             }
         }
@@ -113,13 +127,16 @@ async function sync() {
                     execSync(`xray api rmu --server=${XRAY_API} -tag=vless-grpc "${token}"`);
                     const newState = fs.readFileSync(STATE_FILE, 'utf8').split('\n').filter(t => t !== token).join('\n');
                     fs.writeFileSync(STATE_FILE, newState + (newState ? '\n' : ''));
-                } catch (e) { console.error(`Rem fail: ${token}`); }
+                } catch (e) { console.error(`Remove failed for ${token}`); }
             }
         }
 
         // 2. Report
         const { cpu, ram } = getStats();
         const trafficStats = getXrayStats();
+        
+        console.log(`[${new Date().toLocaleTimeString()}] Reporting: CPU ${cpu}% | RAM ${ram}% | Users ${masterUsers.length}`);
+        
         await fetchMaster('/api/node/report', 'POST', {
             cpuUsage: parseFloat(cpu),
             ramUsage: parseFloat(ram),
@@ -127,10 +144,12 @@ async function sync() {
         });
 
     } catch (err) {
-        console.error('Pulse Error:', err.message);
+        console.error(`[!] Agent Loop Error: ${err.message}`);
     }
 }
 
-console.log('SpicyAgent Node.js Daemon started.');
-setInterval(sync, 10000);
-sync();
+// Initial delay to let Xray boot up
+setTimeout(() => {
+    setInterval(sync, 10000);
+    sync();
+}, 2000);

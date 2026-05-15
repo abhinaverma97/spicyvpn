@@ -107,7 +107,10 @@ async function sync() {
                 const addJson = {
                     inbounds: [{
                         port: 8444, protocol: "vless", tag: "vless-grpc",
-                        settings: { clients: [{ id: user.uuid, email: user.token }] }
+                        settings: { 
+                            decryption: "none",
+                            clients: [{ id: user.uuid, email: user.token }] 
+                        }
                     }]
                 };
                 const tmpFile = `/tmp/add_${user.token}.json`;

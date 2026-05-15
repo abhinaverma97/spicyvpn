@@ -18,13 +18,15 @@ export async function GET() {
   const globalMonthlyRow = db.prepare("SELECT totalUp + totalDown as total FROM monthly_stats WHERE month = ?").get(monthStr) as { total: number } | undefined;
   const globalTotal = globalMonthlyRow?.total || 0;
 
-  // 2. Get traffic for all specific remote nodes (excluding node-1 for now)
-  const remoteTrafficRow = db.prepare(`
+  // 2. Get traffic for all CURRENTLY ACTIVE remote nodes (excluding node-1)
+  const activeRemoteTrafficRow = db.prepare(`
     SELECT SUM(totalUp + totalDown) as total 
     FROM node_bandwidth 
-    WHERE month = ? AND nodeId != 'node-1'
+    WHERE month = ? 
+    AND nodeId != 'node-1'
+    AND nodeId IN (SELECT id FROM nodes)
   `).get(monthStr) as { total: number | null };
-  const remoteTotal = remoteTrafficRow.total || 0;
+  const activeRemoteTotal = activeRemoteTrafficRow.total || 0;
 
   // 3. Fetch all nodes
   const nodes = db.prepare("SELECT * FROM nodes ORDER BY createdAt DESC").all() as any[];
@@ -33,9 +35,9 @@ export async function GET() {
   const enrichedNodes = nodes.map(n => {
     let traffic = 0;
     if (n.id === 'node-1') {
-      // Master node gets the remainder (Global - All Remote Nodes)
-      // This ensures legacy users and early-month history are captured correctly
-      traffic = Math.max(0, globalTotal - remoteTotal);
+      // Master node gets EVERYTHING else
+      // (Global Total) - (Traffic of all other currently listed remote nodes)
+      traffic = Math.max(0, globalTotal - activeRemoteTotal);
     } else {
       // Remote nodes get their specific recorded monthly traffic
       const row = db.prepare("SELECT totalUp + totalDown as total FROM node_bandwidth WHERE nodeId = ? AND month = ?").get(n.id, monthStr) as { total: number } | undefined;

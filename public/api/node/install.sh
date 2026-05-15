@@ -125,9 +125,10 @@ while true; do
         done
     fi
 
-    # 2. Collect Stats (Robust Load-Average Method)
-    # Divided by core count to get a true 0-100% scale
-    CPU=$(awk '{ load=$1 } END { "nproc" | getline cores; if(cores>0) printf "%.1f\n", (load/cores)*100; else print "0.0" }' /proc/loadavg)
+    # 2. Collect Stats (Bulletproof Load Method)
+    CORES=$(grep -c ^processor /proc/cpuinfo)
+    LOAD=$(awk '{print $1}' /proc/loadavg)
+    CPU=$(awk -v l=$LOAD -v c=$CORES 'BEGIN { if(c>0) printf "%.1f\n", (l/c)*100; else print "0.0" }')
     RAM=$(free | grep Mem | awk '{printf "%.1f", $3/$2 * 100.0}')
     
     # 3. Collect Traffic Stats

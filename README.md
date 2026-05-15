@@ -9,8 +9,9 @@ Welcome to the comprehensive documentation for **SpicyVPN**. This project is a f
 2. [Architecture & Process Flow](#2-architecture--process-flow)
 3. [Frontend Details (Control Plane)](#3-frontend-details-control-plane)
 4. [Backend Details (Data Plane & APIs)](#4-backend-details-data-plane--apis)
-5. [Directory Structure](#5-directory-structure)
-6. [Operational Commands](#6-operational-commands)
+5. [Horizontal Scaling Architecture](#5-horizontal-scaling-architecture)
+6. [Directory Structure](#6-directory-structure)
+7. [Operational Commands](#7-operational-commands)
 
 ---
 
@@ -85,7 +86,28 @@ This is the core engine connecting the web database to the VPN server. It runs c
 
 ---
 
-## 5. Directory Structure
+## 5. Horizontal Scaling Architecture
+
+SpicyVPN is designed for global scalability using a **Master-Slave (Orchestrator-Agent)** model. This allows a single control plane to manage a distributed fleet of high-performance nodes across multiple regions and cloud providers.
+
+### **The Master Node (Orchestrator)**
+The primary server (`spicypepper.app`) acts as the Source of Truth and the central brain.
+- **Node Management:** Admins can provision new nodes via the `/admin` console, which generates a unique `apiKey` and a secure one-liner installation command.
+- **Load Balancing (Least Connections):** When a user generates or renews a config, the Master automatically assigns them to the healthiest node with the **lowest number of live users**.
+- **Centralized Data Plane:** The Master exposes a private **Node-API** (authenticated via unique Bearer tokens) that handles all state synchronization.
+
+### **The Remote Nodes (Slaves)**
+Remote nodes are lightweight VPS instances running **Xray-core** and a custom **SpicyAgent** daemon.
+- **Auto-Provisioning:** A multi-architecture `install.sh` script automatically detects `x86_64` vs `ARM64`, configures OS firewalls (Oracle Cloud optimized), and sets up the VPN engine.
+- **State Syncing:** Every 10 seconds, the agent pulls the latest list of authorized UUIDs and Tokens assigned to it from the Master.
+- **Bulletproof Telemetry:**
+  - **CPU Load:** Calculated using a kernel-level delta method reading `/proc/stat` twice over a 1-second interval for 100% accuracy across different Linux distros.
+  - **Bandwidth Tracking:** The agent queries Xray's stats API and pushes raw totals to the Master. The Master then performs the delta calculation to ensure zero data loss during node restarts.
+  - **Live Counts:** The Master dynamically calculates live connections per node based on real-time activity timestamps in the central database.
+
+---
+
+## 6. Directory Structure
 
 A high-level map of the codebase and system dependencies:
 
@@ -118,7 +140,7 @@ A high-level map of the codebase and system dependencies:
 
 ---
 
-## 6. Operational Commands
+## 7. Operational Commands
 
 ### Process Management
 - **VPN Core Engine:** `sudo systemctl restart xray`

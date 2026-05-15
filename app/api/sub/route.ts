@@ -1,4 +1,4 @@
-import { getDb } from "@/lib/db";
+import { getDb, getBestNode } from "@/lib/db";
 
 export const dynamic = 'force-dynamic';
 
@@ -29,14 +29,25 @@ export async function GET(req: Request) {
       return new Response("Subscription expired", { status: 403 });
     }
 
+    // Dynamic Load Balancing: Evaluate and assign the best node RIGHT NOW
+    const bestNode = getBestNode();
+    const targetNodeId = bestNode ? bestNode.id : 'node-1';
+    const targetNodeIp = bestNode ? bestNode.ip : '140.245.13.64';
+
+    // Update the user's assignment in the database so the tracker picks them up
+    if (config.nodeId !== targetNodeId) {
+      db.prepare(`UPDATE vpn_configs SET nodeId = ? WHERE token = ?`).run(targetNodeId, token);
+    }
+
     // Log device activity
     const clientIp = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
     db.prepare(`INSERT OR IGNORE INTO token_devices (token, ip, lastSeen) VALUES (?, ?, ?)`).run(token, clientIp, now);
     db.prepare(`UPDATE token_devices SET lastSeen = ? WHERE token = ? AND ip = ?`).run(now, token, clientIp);
 
     // Return the VLESS + gRPC connection link directly as the subscription content
+    // using the dynamically assigned node IP
     const userName = config.name ? config.name.split(" ")[0] : "User";
-    const vlessLink = `vless://${config.uuid}@140.245.13.64:8444?security=tls&sni=spicypepper.app&type=grpc&serviceName=spicypepper-grpc#SpicyVPN-${userName}`;
+    const vlessLink = `vless://${config.uuid}@${targetNodeIp}:8444?security=tls&sni=spicypepper.app&type=grpc&serviceName=spicypepper-grpc#SpicyVPN-${userName}`;
     const base64Data = Buffer.from(vlessLink).toString('base64');
 
     return new Response(base64Data, {

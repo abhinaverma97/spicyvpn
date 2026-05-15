@@ -171,6 +171,27 @@ export default function Dashboard({ user }: { user: User }) {
       {/* Main */}
       <main className="relative z-10 max-w-5xl mx-auto px-6 py-12">
 
+        {/* Update Alert */}
+        <GlassCard 
+          className="mb-8 border-emerald-500/20 bg-emerald-500/5 p-4 flex items-center justify-between gap-4"
+          intensity={0.1}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+              <Monitor className="w-5 h-5 text-emerald-400" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-emerald-400 uppercase tracking-widest">Update Available</h4>
+              <p className="text-white/60 text-xs">New SpicyVPN Desktop v1.0.68 is now available with high-performance node support.</p>
+            </div>
+          </div>
+          <a 
+            href="https://github.com/abhinaverma97/spicyvpn-desktop/releases/download/v1.0.68/SpicyVPN_1.0.68_x64-setup.exe"
+            className="text-[10px] font-black uppercase tracking-[0.2em] bg-emerald-500 text-black px-4 py-2 rounded-lg hover:bg-emerald-400 transition-colors"
+          >
+            Update Now
+          </a>
+        </GlassCard>
 
         <div className="mb-10">
           <h1 className="text-3xl font-black mb-2 tracking-tight">Your VPN Access</h1>
@@ -343,7 +364,7 @@ export default function Dashboard({ user }: { user: User }) {
                     <span className="text-lg font-bold text-white/80">Windows</span>
                     <div className="ml-auto flex gap-2">
                       <a
-                        href="https://github.com/abhinaverma97/spicyvpn-desktop/releases/download/v1.0.67/SpicyVPN_1.0.67_x64-setup.exe"
+                        href="https://github.com/abhinaverma97/spicyvpn-desktop/releases/download/v1.0.68/SpicyVPN_1.0.68_x64-setup.exe"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-sm font-bold px-4 py-2 rounded-xl border border-emerald-500/20 text-emerald-400 hover:border-emerald-500/40 hover:text-emerald-300 transition-all bg-emerald-500/5"

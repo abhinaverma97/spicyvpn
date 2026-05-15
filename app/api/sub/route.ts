@@ -45,9 +45,11 @@ export async function GET(req: Request) {
     db.prepare(`UPDATE token_devices SET lastSeen = ? WHERE token = ? AND ip = ?`).run(now, token, clientIp);
 
     // Return the VLESS + gRPC connection link directly as the subscription content
-    // using the dynamically assigned node IP
+    // using the dynamically assigned node IP. 
+    // If it's a remote node, we must allow insecure TLS because they use self-signed certificates.
     const userName = config.name ? config.name.split(" ")[0] : "User";
-    const vlessLink = `vless://${config.uuid}@${targetNodeIp}:8444?security=tls&sni=spicypepper.app&type=grpc&serviceName=spicypepper-grpc#SpicyVPN-${userName}`;
+    const allowInsecure = targetNodeId === 'node-1' ? '' : '&allowInsecure=1';
+    const vlessLink = `vless://${config.uuid}@${targetNodeIp}:8444?security=tls&sni=spicypepper.app&type=grpc&serviceName=spicypepper-grpc${allowInsecure}#SpicyVPN-${userName}`;
     const base64Data = Buffer.from(vlessLink).toString('base64');
 
     return new Response(base64Data, {

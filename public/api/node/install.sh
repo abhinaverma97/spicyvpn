@@ -65,10 +65,15 @@ mkdir -p /usr/local/etc/xray /usr/local/bin
 unzip -o xray.zip -d /usr/local/bin
 rm xray.zip
 
-# Create basic Xray config
+# Create Self-Signed SSL Certificate for Stealth TLS
+echo "🔐 Generating Self-Signed TLS Certificates..."
+mkdir -p /usr/local/etc/xray/certs
+openssl req -x509 -newkey rsa:4096 -keyout /usr/local/etc/xray/certs/key.pem -out /usr/local/etc/xray/certs/cert.pem -sha256 -days 3650 -nodes -subj "/CN=spicypepper.app" &>/dev/null
+
+# Create basic Xray config with TLS enabled
 cat <<EOF > /usr/local/etc/xray/config.json
 {
-    "log": { "loglevel": "info" },
+    "log": { "loglevel": "warning" },
     "api": { "tag": "api", "services": ["HandlerService", "StatsService"] },
     "stats": {},
     "policy": {
@@ -87,7 +92,14 @@ cat <<EOF > /usr/local/etc/xray/config.json
             "port": 8444, "protocol": "vless", "tag": "vless-grpc",
             "settings": { "clients": [], "decryption": "none" },
             "streamSettings": {
-                "network": "grpc", "security": "none",
+                "network": "grpc", 
+                "security": "tls",
+                "tlsSettings": {
+                    "certificates": [{
+                        "certificateFile": "/usr/local/etc/xray/certs/cert.pem",
+                        "keyFile": "/usr/local/etc/xray/certs/key.pem"
+                    }]
+                },
                 "grpcSettings": { "serviceName": "spicypepper-grpc" }
             }
         }

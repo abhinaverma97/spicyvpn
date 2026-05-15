@@ -53,9 +53,10 @@ The frontend serves as the centralized management console, utilizing a unified "
 - **Client Guides:** Provides direct download links to the custom **SpicyVPN Desktop App** (v1.0.67+) and guides for Hiddify/Nekobox.
 
 ### **Admin Console (`/admin`)**
-- **Live Fleet Monitoring:** Accurately calculates "Live Now" users. It determines this by scanning the database for any user whose `lastActive` timestamp was updated by the traffic tracker within the last 60 seconds.
-- **Hardware Telemetry:** Displays real-time VPS CPU load, Memory usage, Storage, and Global Throughput by executing low-level shell commands (`os.cpus()`, `df`, etc.) via the `/api/admin/stats` route.
-- **Identity Registry:** Allows administrators to filter the fleet (Live Users, Active Subs, Newest) and forcefully revoke access keys. Revocations are detected by the sync daemon and instantly pushed to Xray.
+- **Tabbed Interface:** Features a dual-pane dashboard with **Users** and **Nodes** management tabs for streamlined fleet oversight.
+- **Node Lifecycle Management:** Allows instant provisioning of new remote nodes. Admins provide a name and IP, and the system generates a secure `apiKey` and a custom multi-architecture `curl` installer command.
+- **Live Fleet Monitoring:** Accurately calculates "Live Now" users per node. It determines this by scanning the central database for any user whose `lastActive` timestamp was updated by either the local or remote tracker within the last 60 seconds.
+- **Hardware Telemetry:** Displays real-time VPS CPU load, Memory usage, Storage, and Global Throughput. 
 
 ---
 
@@ -69,19 +70,14 @@ To bypass domain-level blocking (common in restricted environments like colleges
 - **Role:** Acts as a transparent proxy for the `/api/sub` endpoint. 
 - **Mechanism:** When the primary `spicypepper.app` domain is unreachable, the desktop client automatically fails over to this worker. The worker fetches the subscription data from the server's API and returns it with preserved headers, ensuring zero downtime for users on blocked networks.
 
-### **Next.js API Routes**
-- **`/api/vpn`:** Handles the creation and renewal of identities. It enforces a strict 1-active-config-per-user rule. When generating, it sets `expiresAt` (now + 30 days) and `dataLimit` (50GB).
-- **`/api/admin/stats`:** Gathers OS-level metrics and aggregates SQLite data to feed the Admin Dashboard.
-- **`/api/sub`:** Acts as the endpoint for client auto-updates. 
-  - Validates the user token.
-  - Updates the `token_devices` table to track client IP addresses.
-  - Dynamically constructs the Base64-encoded `vless://` payload.
-  - Returns `Subscription-Userinfo` headers so mobile clients can natively display upload/download stats and data limits locally.
+### **Next.js Node APIs**
+- **`/api/admin/nodes`:** Handles Node CRUD operations. It also performs **Zero-Loss Accounting** by aggregating traffic from both active and deleted nodes to ensure the global dashboard always matches the regional sum.
+- **`/api/node/sync`:** The high-speed endpoint for remote agents to fetch their assigned user identities and cryptographic tokens.
+- **`/api/node/report`:** The primary heartbeat receiver. It processes raw telemetry data and performs server-side differential math to update user bandwidth totals securely.
 
 ### **The Telemetry Daemon (`xray-traffic-tracker.mjs`)**
 This is the core engine connecting the web database to the VPN server. It runs continuously via `systemd` (`xray-tracker.service`).
-- **Target:** Connects to Xray's API port on `127.0.0.1:10085`.
-- **Target Tag:** Pushes configurations explicitly to the `vless-grpc` inbound tag on Port 8444.
+- **Master Node Duty:** Scopes its database queries to only handle users explicitly assigned to `node-1`.
 - **Conflict Resolution:** Maintains a `Set` of known tokens to minimize unnecessary API calls to Xray. It handles concurrent additions/removals safely and logs all Kicker and Cleanup events.
 
 ---
@@ -92,18 +88,23 @@ SpicyVPN is designed for global scalability using a **Master-Slave (Orchestrator
 
 ### **The Master Node (Orchestrator)**
 The primary server (`spicypepper.app`) acts as the Source of Truth and the central brain.
-- **Node Management:** Admins can provision new nodes via the `/admin` console, which generates a unique `apiKey` and a secure one-liner installation command.
-- **Load Balancing (Least Connections):** When a user generates or renews a config, the Master automatically assigns them to the healthiest node with the **lowest number of live users**.
-- **Centralized Data Plane:** The Master exposes a private **Node-API** (authenticated via unique Bearer tokens) that handles all state synchronization.
+- **Stateless Scaling:** Remote nodes hold zero local data. User records, traffic totals, and expiration dates live exclusively in the Master SQLite database.
+- **Load Balancing (Least Connections):** When a user generates or renews a config, the Master automatically assigns them to the node with the **lowest number of live users** to ensure even load distribution.
+- **Regional Bandwidth Isolation:** Traffic generated on Node-B is reported to the Master and billed correctly to the user's global quota, but the data is physically processed only by the regional VPS.
 
 ### **The Remote Nodes (Slaves)**
 Remote nodes are lightweight VPS instances running **Xray-core** and a custom **SpicyAgent** daemon.
-- **Auto-Provisioning:** A multi-architecture `install.sh` script automatically detects `x86_64` vs `ARM64`, configures OS firewalls (Oracle Cloud optimized), and sets up the VPN engine.
-- **State Syncing:** Every 10 seconds, the agent pulls the latest list of authorized UUIDs and Tokens assigned to it from the Master.
-- **Bulletproof Telemetry:**
-  - **CPU Load:** Calculated using a kernel-level delta method reading `/proc/stat` twice over a 1-second interval for 100% accuracy across different Linux distros.
-  - **Bandwidth Tracking:** The agent queries Xray's stats API and pushes raw totals to the Master. The Master then performs the delta calculation to ensure zero data loss during node restarts.
-  - **Live Counts:** The Master dynamically calculates live connections per node based on real-time activity timestamps in the central database.
+- **Auto-Provisioning:** A multi-architecture `install.sh` script automatically detects `x86_64` vs `ARM64`.
+- **Firewall Automation:** The installer automatically configures `iptables` for Oracle Cloud (OCI) environments, opening Port 8444 (VPN) and enabling ICMP for latency checks.
+- **User Synchronization:** Every 10 seconds, the agent pulls the latest list of authorized users. It performs a file-based diff using standard Linux tools (`comm`, `sort`) and issues `xray api adu/rmu` commands to dynamically update the tunnel.
+
+### **Precision Telemetry Logic**
+- **Stability-First CPU Monitoring:** Instead of jittery 1-second snapshots, the agent calculates CPU usage using the **1-minute Load Average** divided by the total logical core count. This ensures consistent 0-100% reporting across different CPU architectures.
+- **Safe Delta Bandwidth Tracking:** To prevent "billing leaks" during Xray restarts (which reset counters to zero), the system uses a **Differential Math** model.
+  1. The Agent pushes raw totals to the Master.
+  2. The Master compares this against the `lastTraffic` snapshot stored in the DB.
+  3. If the total dropped (restart detected), the Master resets the snapshot and only bills the new incremental data.
+- **Zero-Loss Accounting (The General Ledger):** To solve the "Ghost Traffic" problem when nodes are deleted, the Master Node record acts as a catch-all for any traffic that isn't explicitly claimed by an active remote node. This guarantees that your main dashboard total is always 100% accurate.
 
 ---
 

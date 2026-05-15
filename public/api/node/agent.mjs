@@ -135,7 +135,7 @@ async function sync() {
         const { cpu, ram } = getStats();
         const trafficStats = getXrayStats();
         
-        process.stdout.write(`\r[REPORT] CPU: ${cpu}% | RAM: ${ram}% | Users: ${masterUsers.length}   `);
+        console.log(`[REPORT] CPU: ${cpu}% | RAM: ${ram}% | Users: ${masterUsers.length}`);
         
         await fetchMaster('/api/node/report', 'POST', {
             cpuUsage: parseFloat(cpu),
@@ -144,10 +144,15 @@ async function sync() {
         });
 
     } catch (err) {
-        console.error(`\n[!] Agent Loop Error: ${err.message}`);
+        console.error(`[!] Agent Loop Error: ${err.message}`);
     }
 }
 
-// Start the loop
-setInterval(sync, 10000);
-sync();
+// Warm up CPU stats
+getStats();
+
+// Start the loop after 1.5s to get an accurate first reading
+setTimeout(() => {
+    sync();
+    setInterval(sync, 10000);
+}, 1500);

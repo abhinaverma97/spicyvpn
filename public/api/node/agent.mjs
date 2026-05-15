@@ -4,10 +4,9 @@ import os from 'os';
 
 const KEY_FILE = '/etc/spicyvpn/key';
 const MASTER_FILE = '/etc/spicyvpn/master';
-const STATE_FILE = '/etc/spicyvpn/state';
 const XRAY_API = '127.0.0.1:10085';
 
-console.log('🌶️ SpicyAgent Daemon starting...');
+console.log('🌶️ SpicyAgent Daemon starting (High-Performance Batch Mode)...');
 
 if (!fs.existsSync(KEY_FILE) || !fs.existsSync(MASTER_FILE)) {
     console.error('Fatal: Missing configuration files in /etc/spicyvpn/');
@@ -16,8 +15,6 @@ if (!fs.existsSync(KEY_FILE) || !fs.existsSync(MASTER_FILE)) {
 
 const KEY = fs.readFileSync(KEY_FILE, 'utf8').trim();
 const MASTER = fs.readFileSync(MASTER_FILE, 'utf8').trim();
-
-if (!fs.existsSync(STATE_FILE)) fs.writeFileSync(STATE_FILE, '');
 
 let lastCpuStats = null;
 
@@ -95,46 +92,50 @@ function getXrayStats() {
 
 async function sync() {
     try {
-        // 1. Sync
+        // 1. Fetch entire desired fleet state from Master
         const data = await fetchMaster('/api/node/sync');
         const masterUsers = data.users || [];
-        const masterTokens = masterUsers.map(u => u.token);
-        const localTokens = fs.readFileSync(STATE_FILE, 'utf8').split('\n').filter(Boolean);
         
-        for (const user of masterUsers) {
-            if (!localTokens.includes(user.token)) {
-                console.log(`[SYNC] Adding user: ${user.token}`);
-                const addJson = {
-                    inbounds: [{
-                        port: 8444, protocol: "vless", tag: "vless-grpc",
-                        settings: { 
-                            decryption: "none",
-                            clients: [{ id: user.uuid, email: user.token }] 
-                        }
-                    }]
-                };
-                const tmpFile = `/tmp/add_${user.token}.json`;
-                fs.writeFileSync(tmpFile, JSON.stringify(addJson));
-                try {
-                    execSync(`xray api adu --server=${XRAY_API} ${tmpFile}`);
-                    fs.appendFileSync(STATE_FILE, user.token + '\n');
-                } catch (e) { console.error(`Add failed for ${user.token}`); }
-                if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
-            }
-        }
+        // 2. Perform Single Batch Update to Xray
+        // This replaces the entire user list and re-applies full TLS/gRPC settings
+        // to prevent "Security Stripping" and massive CPU spikes from process spawning.
+        const syncPayload = {
+            inbounds: [{
+                port: 8444,
+                protocol: "vless",
+                tag: "vless-grpc",
+                settings: { 
+                    decryption: "none",
+                    clients: masterUsers.map(u => ({ id: u.uuid, email: u.token }))
+                },
+                streamSettings: {
+                    network: "grpc",
+                    security: "tls",
+                    tlsSettings: {
+                        alpn: ["h2"],
+                        certificates: [{
+                            certificateFile: "/usr/local/etc/xray/certs/cert.pem",
+                            keyFile: "/usr/local/etc/xray/certs/key.pem"
+                        }]
+                    },
+                    grpcSettings: {
+                        serviceName: "spicypepper-grpc"
+                    }
+                }
+            }]
+        };
 
-        for (const token of localTokens) {
-            if (!masterTokens.includes(token)) {
-                console.log(`[SYNC] Removing user: ${token}`);
-                try {
-                    execSync(`xray api rmu --server=${XRAY_API} -tag=vless-grpc "${token}"`);
-                    const newState = fs.readFileSync(STATE_FILE, 'utf8').split('\n').filter(t => t !== token).join('\n');
-                    fs.writeFileSync(STATE_FILE, newState + (newState ? '\n' : ''));
-                } catch (e) { console.error(`Remove failed for ${token}`); }
-            }
+        const tmpFile = '/tmp/xray_sync.json';
+        fs.writeFileSync(tmpFile, JSON.stringify(syncPayload));
+        try {
+            // Using 'adu' with a full inbound JSON overwrites the tag correctly in one go
+            execSync(`xray api adu --server=${XRAY_API} ${tmpFile}`);
+        } catch (e) {
+            console.error('[!] Xray Batch Sync Failed:', e.message);
         }
+        if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
 
-        // 2. Report
+        // 3. Report Telemetry
         const { cpu, ram } = getStats();
         const trafficStats = getXrayStats();
         
@@ -147,14 +148,14 @@ async function sync() {
         });
 
     } catch (err) {
-        console.error(`[!] Agent Loop Error: ${err.message}`);
+        console.error(`[!] Sync Cycle Failed: ${err.message}`);
     }
 }
 
 // Warm up CPU stats
 getStats();
 
-// Start the loop after 1.5s to get an accurate first reading
+// High-performance loop
 setTimeout(() => {
     sync();
     setInterval(sync, 10000);

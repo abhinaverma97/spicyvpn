@@ -36,15 +36,12 @@ apt-get update && apt-get install -y curl unzip jq iptables-persistent
 
 # Oracle Cloud / Ubuntu Firewall setup
 echo "🛡️ Configuring Firewall (iptables)..."
-# Intersert rules at the top to bypass default REJECT rules on OCI
 iptables -I INPUT 1 -p icmp -j ACCEPT
 iptables -I INPUT 1 -p tcp --dport 8444 -j ACCEPT
 iptables -I INPUT 1 -p udp --dport 8444 -j ACCEPT
-# Also allow standard web ports just in case
 iptables -I INPUT 1 -p tcp --dport 80 -j ACCEPT
 iptables -I INPUT 1 -p tcp --dport 443 -j ACCEPT
 
-# Save the rules so they persist across reboots
 mkdir -p /etc/iptables
 iptables-save > /etc/iptables/rules.v4
 if command -v netfilter-persistent &> /dev/null; then
@@ -91,11 +88,12 @@ cat <<EOF > /usr/local/etc/xray/config.json
 }
 EOF
 
-# Install SpicyAgent (Simplified for this script - ideally a standalone binary or JS script)
+# Install SpicyAgent
 echo "🔥 Setting up SpicyAgent..."
 mkdir -p /etc/spicyvpn
 echo "$NODE_KEY" > /etc/spicyvpn/key
 echo "$MASTER_URL" > /etc/spicyvpn/master
+touch /etc/spicyvpn/state
 
 cat <<'EOF' > /usr/local/bin/spicy-agent
 #!/bin/bash
@@ -103,83 +101,44 @@ KEY=$(cat /etc/spicyvpn/key)
 MASTER=$(cat /etc/spicyvpn/master)
 XRAY_API="127.0.0.1:10085"
 
-previous_stats="{}"
-KNOWN_TOKENS=()
-
 while true; do
-    # 1. Sync Users
+    # 1. Sync Users (File-based comparison for maximum compatibility)
     SYNC=$(curl -s -f -H "Authorization: Bearer $KEY" "$MASTER/api/node/sync")
     if [ $? -eq 0 ]; then
-        ACTIVE_TOKENS=$(echo "$SYNC" | jq -r '.users[] | .token')
+        echo "$SYNC" | jq -r '.users[] | .token' | sort > /tmp/master_tokens
+        sort /etc/spicyvpn/state > /tmp/local_tokens
         
-        # Add new users
-        for user_json in $(echo "$SYNC" | jq -c '.users[]'); do
-            TOKEN=$(echo "$user_json" | jq -r '.token')
-            UUID=$(echo "$user_json" | jq -r '.uuid')
-            
-            # Use a more compatible way to check if token exists in KNOWN_TOKENS array
-            exists=0
-            for k in "${KNOWN_TOKENS[@]}"; do [[ "$k" == "$TOKEN" ]] && exists=1 && break; done
-            
-            if [ $exists -eq 0 ]; then
-                echo "[SYNC] Adding user: $TOKEN"
-                cat <<EOF > /tmp/add_user.json
-{
-  "inbounds": [{
-    "port": 8444, "protocol": "vless", "tag": "vless-grpc",
-    "settings": { "clients": [{"id": "$UUID", "email": "$TOKEN"}] }
-  }]
-}
-EOF
-                xray api adu --server=$XRAY_API /tmp/add_user.json &>/dev/null
-                KNOWN_TOKENS+=("$TOKEN")
+        # ADD new users
+        comm -23 /tmp/master_tokens /tmp/local_tokens | while read -r TOKEN; do
+            UUID=$(echo "$SYNC" | jq -r ".users[] | select(.token==\"$TOKEN\") | .uuid")
+            if [ ! -z "$UUID" ]; then
+                echo "{\"inbounds\": [{\"port\": 8444, \"protocol\": \"vless\", \"tag\": \"vless-grpc\", \"settings\": {\"clients\": [{\"id\": \"$UUID\", \"email\": \"$TOKEN\"}]}}]}" > /tmp/add.json
+                xray api adu --server=$XRAY_API /tmp/add.json &>/dev/null
+                echo "$TOKEN" >> /etc/spicyvpn/state
             fi
         done
-
-        # Remove users no longer in the master list
-        for i in "${!KNOWN_TOKENS[@]}"; do
-            TOKEN="${KNOWN_TOKENS[$i]}"
-            exists=0
-            for a in ${ACTIVE_TOKENS[@]}; do [[ "$a" == "$TOKEN" ]] && exists=1 && break; done
-            
-            if [ $exists -eq 0 ]; then
-                echo "[SYNC] Removing user: $TOKEN"
-                xray api rmu --server=$XRAY_API -tag=vless-grpc "$TOKEN" &>/dev/null
-                unset 'KNOWN_TOKENS[$i]'
-            fi
+        
+        # REMOVE old users
+        comm -13 /tmp/master_tokens /tmp/local_tokens | while read -r TOKEN; do
+            xray api rmu --server=$XRAY_API -tag=vless-grpc "$TOKEN" &>/dev/null
+            sed -i "/^$TOKEN$/d" /etc/spicyvpn/state
         done
-        # Re-index array
-        KNOWN_TOKENS=("${KNOWN_TOKENS[@]}")
     fi
 
-    # 2. Collect Stats
-    # We calculate CPU usage by taking a 1-second delta from /proc/stat to get the true current load
-    read cpu user nice system idle iowait irq softirq steal guest < /proc/stat
-    sleep 1
-    read cpu user2 nice2 system2 idle2 iowait2 irq2 softirq2 steal2 guest2 < /proc/stat
-    prev_idle=$((idle + iowait))
-    idle_total=$((idle2 + iowait2))
-    prev_non_idle=$((user + nice + system + irq + softirq + steal))
-    non_idle=$((user2 + nice2 + system2 + irq2 + softirq2 + steal2))
-    prev_total=$((prev_idle + prev_non_idle))
-    total=$((idle_total + non_idle))
-    total_diff=$((total - prev_total))
-    idle_diff=$((idle_total - prev_idle))
-    CPU=$(awk -v t=$total_diff -v i=$idle_diff 'BEGIN { if(t>0) printf "%.1f\n", (t-i)*100/t; else print "0.0" }')
-    
+    # 2. Collect Stats (Robust Load-Average Method)
+    # Divided by core count to get a true 0-100% scale
+    CPU=$(awk '{ load=$1 } END { "nproc" | getline cores; if(cores>0) printf "%.1f\n", (load/cores)*100; else print "0.0" }' /proc/loadavg)
     RAM=$(free | grep Mem | awk '{printf "%.1f", $3/$2 * 100.0}')
     
-    # 3. Collect Traffic Stats from Xray
+    # 3. Collect Traffic Stats
     XRAY_STATS=$(xray api statsquery --server=$XRAY_API 2>/dev/null || echo '{"stat":[]}')
     TRAFFIC_STATS=$(echo "$XRAY_STATS" | jq -c 'if .stat == null then {} else reduce .stat[] as $item ({}; ($item.name | split(">>>")) as $parts | if $parts[0] == "user" then .[$parts[1]][$parts[3]] = ($item.value | tonumber) else . end) end')
-    if [ -z "$TRAFFIC_STATS" ]; then TRAFFIC_STATS="{}"; fi
     
     # 4. Report back
-    curl -s -X POST -H "Authorization: Bearer $KEY" \
-         -H "Content-Type: application/json" \
-         -d "{\"cpuUsage\": $CPU, \"ramUsage\": $RAM, \"trafficStats\": $TRAFFIC_STATS}" \
+    curl -s -X POST -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+         -d "{\"cpuUsage\": $CPU, \"ramUsage\": $RAM, \"trafficStats\": ${TRAFFIC_STATS:-{}}}" \
          "$MASTER/api/node/report"
-
+    
     sleep 10
 done
 EOF
@@ -189,7 +148,7 @@ chmod +x /usr/local/bin/spicy-agent
 cat <<EOF > /etc/systemd/system/xray.service
 [Unit]
 Description=Xray Service
-After=network.target nss-lookup.target
+After=network.target
 [Service]
 User=root
 ExecStart=/usr/local/bin/xray run -config /usr/local/etc/xray/config.json

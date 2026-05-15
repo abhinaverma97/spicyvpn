@@ -100,6 +100,15 @@ function initSchema(db: Database.Database) {
       totalUp INTEGER DEFAULT 0,
       totalDown INTEGER DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS node_bandwidth (
+      nodeId TEXT NOT NULL,
+      month TEXT NOT NULL,
+      totalUp INTEGER DEFAULT 0,
+      totalDown INTEGER DEFAULT 0,
+      PRIMARY KEY (nodeId, month),
+      FOREIGN KEY (nodeId) REFERENCES nodes(id) ON DELETE CASCADE
+    );
   `);
 
   // Simple migrations for existing tables

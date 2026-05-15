@@ -23,10 +23,11 @@ async function syncAndTrack() {
     const now = Math.floor(Date.now() / 1000);
     const monthStr = new Date().toISOString().substring(0, 7);
 
-    // 1. Get all active users from DB
+    // 1. Get all active users from DB assigned specifically to the master node
     const activeUsers = db.prepare(`
       SELECT * FROM vpn_configs 
       WHERE active = 1 AND expiresAt > ? AND (totalUp + totalDown) < dataLimit
+      AND (nodeId = 'node-1' OR nodeId IS NULL)
     `).all(now);
     const activeTokens = new Set(activeUsers.map(u => u.token));
 
@@ -107,6 +108,10 @@ async function syncAndTrack() {
 
           db.prepare(`INSERT OR IGNORE INTO monthly_stats (month, totalUp, totalDown) VALUES (?, 0, 0)`).run(monthStr);
           db.prepare(`UPDATE monthly_stats SET totalUp = totalUp + ?, totalDown = totalDown + ? WHERE month = ?`).run(diffUp, diffDown, monthStr);
+
+          // Track monthly bandwidth for the master node specifically
+          db.prepare(`INSERT OR IGNORE INTO node_bandwidth (nodeId, month, totalUp, totalDown) VALUES ('node-1', ?, 0, 0)`).run(monthStr);
+          db.prepare(`UPDATE node_bandwidth SET totalUp = totalUp + ?, totalDown = totalDown + ? WHERE nodeId = 'node-1' AND month = ?`).run(diffUp, diffDown, monthStr);
         }
 
         const user = db.prepare("SELECT * FROM vpn_configs WHERE token = ?").get(token);

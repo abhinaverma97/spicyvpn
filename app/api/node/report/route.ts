@@ -18,17 +18,26 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { cpuUsage, ramUsage, liveUsers, trafficStats } = body;
+    const { cpuUsage, ramUsage, trafficStats } = body;
 
     const now = Math.floor(Date.now() / 1000);
     const monthStr = new Date().toISOString().substring(0, 7);
 
+    // Parse previous traffic state
+    let prevTraffic = {};
+    try { prevTraffic = JSON.parse(node.lastTraffic || "{}"); } catch (e) {}
+
     db.transaction(() => {
-      // 1. Update Traffic for users assigned to this node first
+      // 1. Compute diffs and update traffic for users assigned to this node
       if (trafficStats && typeof trafficStats === 'object') {
         for (const [token, stats] of Object.entries(trafficStats) as [string, any][]) {
-          const diffUp = stats.diffUp || 0;
-          const diffDown = stats.diffDown || 0;
+          const prev = prevTraffic[token as keyof typeof prevTraffic] || { uplink: 0, downlink: 0 };
+          let diffUp = (stats.uplink || 0) - (prev as any).uplink;
+          let diffDown = (stats.downlink || 0) - (prev as any).downlink;
+
+          // Handle Xray restarts (counters reset to 0)
+          if (diffUp < 0) diffUp = stats.uplink || 0;
+          if (diffDown < 0) diffDown = stats.downlink || 0;
 
           if (diffUp > 0 || diffDown > 0) {
             db.prepare(`
@@ -39,6 +48,9 @@ export async function POST(req: Request) {
 
             db.prepare(`INSERT OR IGNORE INTO monthly_stats (month, totalUp, totalDown) VALUES (?, 0, 0)`).run(monthStr);
             db.prepare(`UPDATE monthly_stats SET totalUp = totalUp + ?, totalDown = totalDown + ? WHERE month = ?`).run(diffUp, diffDown, monthStr);
+
+            db.prepare(`INSERT OR IGNORE INTO node_bandwidth (nodeId, month, totalUp, totalDown) VALUES (?, ?, 0, 0)`).run(node.id, monthStr);
+            db.prepare(`UPDATE node_bandwidth SET totalUp = totalUp + ?, totalDown = totalDown + ? WHERE nodeId = ? AND month = ?`).run(diffUp, diffDown, node.id, monthStr);
           }
         }
       }
@@ -47,12 +59,12 @@ export async function POST(req: Request) {
       const liveUsersQuery = db.prepare(`SELECT COUNT(*) as count FROM vpn_configs WHERE lastActive >= ? AND nodeId = ?`).get(now - 60, node.id) as any;
       const calculatedLiveUsers = liveUsersQuery ? liveUsersQuery.count : 0;
 
-      // 3. Update Node Stats
+      // 3. Update Node Stats & Save current traffic as lastTraffic for next diff
       db.prepare(`
         UPDATE nodes 
-        SET cpuUsage = ?, ramUsage = ?, liveUsers = ?, lastHeartbeat = ?, status = 'active'
+        SET cpuUsage = ?, ramUsage = ?, liveUsers = ?, lastHeartbeat = ?, status = 'active', lastTraffic = ?
         WHERE id = ?
-      `).run(cpuUsage, ramUsage, calculatedLiveUsers, now, node.id);
+      `).run(cpuUsage, ramUsage, calculatedLiveUsers, now, JSON.stringify(trafficStats || {}), node.id);
     })();
 
     return NextResponse.json({ success: true });

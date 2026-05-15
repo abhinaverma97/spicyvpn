@@ -1,10 +1,11 @@
 #!/bin/bash
 set -e
 
-# SpicyVPN Node Install Script
-# Usage: curl -sL https://spicypepper.app/api/node/install.sh | sudo bash -s -- --key <API_KEY> --master <MASTER_URL>
+# SpicyVPN Professional Node Installer
+# Multi-Architecture (x86_64 / ARM64)
+# Robust, Low-CPU Node.js Agent
 
-echo "🌶️ SpicyVPN Node Installer - Starting..."
+echo "🌶️ SpicyVPN High-Performance Installer - Starting..."
 
 # Parse arguments
 while [[ "$#" -gt 0 ]]; do
@@ -30,9 +31,16 @@ esac
 
 echo "✅ Detected architecture: $ARCH"
 
-# Update and install dependencies
+# Update and install basic dependencies
 echo "🛠️ Installing dependencies..."
 apt-get update && apt-get install -y curl unzip jq iptables-persistent
+
+# Install Node.js (Minimal LTS) if not present
+if ! command -v node &> /dev/null; then
+    echo "📦 Installing Node.js Runtime..."
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    apt-get install -y nodejs
+fi
 
 # Oracle Cloud / Ubuntu Firewall setup
 echo "🛡️ Configuring Firewall (iptables)..."
@@ -88,62 +96,15 @@ cat <<EOF > /usr/local/etc/xray/config.json
 }
 EOF
 
-# Install SpicyAgent
+# Setup Agent Configuration
 echo "🔥 Setting up SpicyAgent..."
 mkdir -p /etc/spicyvpn
 echo "$NODE_KEY" > /etc/spicyvpn/key
 echo "$MASTER_URL" > /etc/spicyvpn/master
 touch /etc/spicyvpn/state
 
-cat <<'EOF' > /usr/local/bin/spicy-agent
-#!/bin/bash
-KEY=$(cat /etc/spicyvpn/key)
-MASTER=$(cat /etc/spicyvpn/master)
-XRAY_API="127.0.0.1:10085"
-
-while true; do
-    # 1. Sync Users (File-based comparison for maximum compatibility)
-    SYNC=$(curl -s -f -H "Authorization: Bearer $KEY" "$MASTER/api/node/sync")
-    if [ $? -eq 0 ]; then
-        echo "$SYNC" | jq -r '.users[] | .token' | sort > /tmp/master_tokens
-        sort /etc/spicyvpn/state > /tmp/local_tokens
-        
-        # ADD new users
-        comm -23 /tmp/master_tokens /tmp/local_tokens | while read -r TOKEN; do
-            UUID=$(echo "$SYNC" | jq -r ".users[] | select(.token==\"$TOKEN\") | .uuid")
-            if [ ! -z "$UUID" ]; then
-                echo "{\"inbounds\": [{\"port\": 8444, \"protocol\": \"vless\", \"tag\": \"vless-grpc\", \"settings\": {\"clients\": [{\"id\": \"$UUID\", \"email\": \"$TOKEN\"}]}}]}" > /tmp/add.json
-                xray api adu --server=$XRAY_API /tmp/add.json &>/dev/null
-                echo "$TOKEN" >> /etc/spicyvpn/state
-            fi
-        done
-        
-        # REMOVE old users
-        comm -13 /tmp/master_tokens /tmp/local_tokens | while read -r TOKEN; do
-            xray api rmu --server=$XRAY_API -tag=vless-grpc "$TOKEN" &>/dev/null
-            sed -i "/^$TOKEN$/d" /etc/spicyvpn/state
-        done
-    fi
-
-    # 2. Collect Stats (Bulletproof Load Method)
-    CORES=$(grep -c ^processor /proc/cpuinfo)
-    LOAD=$(awk '{print $1}' /proc/loadavg)
-    CPU=$(awk -v l=$LOAD -v c=$CORES 'BEGIN { if(c>0) printf "%.1f\n", (l/c)*100; else print "0.0" }')
-    RAM=$(free | grep Mem | awk '{printf "%.1f", $3/$2 * 100.0}')
-    
-    # 3. Collect Traffic Stats
-    XRAY_STATS=$(xray api statsquery --server=$XRAY_API 2>/dev/null || echo '{"stat":[]}')
-    TRAFFIC_STATS=$(echo "$XRAY_STATS" | jq -c 'if .stat == null then {} else reduce .stat[] as $item ({}; ($item.name | split(">>>")) as $parts | if $parts[0] == "user" then .[$parts[1]][$parts[3]] = ($item.value | tonumber) else . end) end')
-    
-    # 4. Report back
-    curl -s -X POST -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
-         -d "{\"cpuUsage\": $CPU, \"ramUsage\": $RAM, \"trafficStats\": ${TRAFFIC_STATS:-{}}}" \
-         "$MASTER/api/node/report"
-    
-    sleep 10
-done
-EOF
-chmod +x /usr/local/bin/spicy-agent
+# Download the high-performance agent script
+curl -sL "${MASTER_URL}/api/node/agent.mjs" -o /usr/local/bin/spicy-agent.mjs
 
 # Systemd Services
 cat <<EOF > /etc/systemd/system/xray.service
@@ -160,17 +121,19 @@ EOF
 
 cat <<EOF > /etc/systemd/system/spicy-agent.service
 [Unit]
-Description=SpicyVPN Agent
+Description=SpicyVPN High-Performance Agent
 After=xray.service
 [Service]
-ExecStart=/usr/local/bin/spicy-agent
+ExecStart=/usr/bin/node /usr/local/bin/spicy-agent.mjs
 Restart=always
+StandardOutput=journal
+StandardError=journal
 [Install]
 WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
 systemctl enable xray spicy-agent
-systemctl start xray spicy-agent
+systemctl restart xray spicy-agent
 
-echo "🚀 Node successfully installed and connected to Master!"
+echo "🚀 High-Performance Node successfully installed!"

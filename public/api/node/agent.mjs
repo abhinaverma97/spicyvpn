@@ -7,7 +7,7 @@ const MASTER_FILE = '/etc/spicyvpn/master';
 const STATE_FILE = '/etc/spicyvpn/state';
 const XRAY_API = '127.0.0.1:10085';
 
-console.log('SpicyAgent High-Performance Daemon starting...');
+console.log('🌶️ SpicyAgent Daemon starting...');
 
 if (!fs.existsSync(KEY_FILE) || !fs.existsSync(MASTER_FILE)) {
     console.error('Fatal: Missing configuration files in /etc/spicyvpn/');
@@ -20,13 +20,14 @@ const MASTER = fs.readFileSync(MASTER_FILE, 'utf8').trim();
 if (!fs.existsSync(STATE_FILE)) fs.writeFileSync(STATE_FILE, '');
 
 let lastCpuStats = null;
+
 function getStats() {
     try {
         const content = fs.readFileSync('/proc/stat', 'utf8');
         const line = content.split('\n').find(l => l.startsWith('cpu'));
         if (!line) return { cpu: "0.0", ram: "0.0" };
 
-        const stats = line.split(/\s+/)
+        const stats = line.trim().split(/\s+/)
             .filter(x => x.length > 0 && !isNaN(x))
             .map(Number);
 
@@ -47,9 +48,7 @@ function getStats() {
         const ram = (((os.totalmem() - os.freemem()) / os.totalmem()) * 100).toFixed(1);
         return { cpu, ram };
     } catch (e) {
-        return { cpu: "0.0", ram: "0.0" };
-    }
-}
+        console.error('Stats Collection Error:', e.message);
         return { cpu: "0.0", ram: "0.0" };
     }
 }
@@ -63,9 +62,7 @@ async function fetchMaster(path, method = 'GET', body = null) {
             'Content-Type': 'application/json',
             'User-Agent': 'SpicyAgent/1.0'
         },
-        body: body ? JSON.stringify(body) : null,
-        // Reliability: On some VPS nodes, we need to bypass strict SSL for internal node-to-master reporting
-        // but since we are using native fetch, we'll stick to standard first.
+        body: body ? JSON.stringify(body) : null
     });
     
     if (!res.ok) {
@@ -138,7 +135,7 @@ async function sync() {
         const { cpu, ram } = getStats();
         const trafficStats = getXrayStats();
         
-        console.log(`[${new Date().toLocaleTimeString()}] Reporting: CPU ${cpu}% | RAM ${ram}% | Users ${masterUsers.length}`);
+        process.stdout.write(`\r[REPORT] CPU: ${cpu}% | RAM: ${ram}% | Users: ${masterUsers.length}   `);
         
         await fetchMaster('/api/node/report', 'POST', {
             cpuUsage: parseFloat(cpu),
@@ -147,12 +144,10 @@ async function sync() {
         });
 
     } catch (err) {
-        console.error(`[!] Agent Loop Error: ${err.message}`);
+        console.error(`\n[!] Agent Loop Error: ${err.message}`);
     }
 }
 
-// Initial delay to let Xray boot up
-setTimeout(() => {
-    setInterval(sync, 10000);
-    sync();
-}, 2000);
+// Start the loop
+setInterval(sync, 10000);
+sync();

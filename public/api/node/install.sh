@@ -137,3 +137,8 @@ systemctl enable xray spicy-agent
 systemctl restart xray spicy-agent
 
 echo "🚀 High-Performance Node successfully installed!"
+echo "📈 Current Node Telemetry (Live):"
+sleep 5
+journalctl -u spicy-agent -n 1 --no-pager
+echo "--------------------------------------------------"
+

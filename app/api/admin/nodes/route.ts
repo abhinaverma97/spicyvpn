@@ -68,7 +68,7 @@ export async function POST(req: Request) {
   }
 
   const db = getDb();
-  const { name, ip } = await req.json();
+  const { name, ip, domain } = await req.json();
 
   if (!name || !ip) {
     return NextResponse.json({ error: "Name and IP are required" }, { status: 400 });
@@ -78,16 +78,20 @@ export async function POST(req: Request) {
   const apiKey = "sp_node_" + randomBytes(16).toString("hex");
 
   db.prepare(`
-    INSERT INTO nodes (id, name, ip, apiKey, status, lastHeartbeat)
-    VALUES (?, ?, ?, ?, 'active', 0)
-  `).run(id, name, ip, apiKey);
+    INSERT INTO nodes (id, name, ip, domain, apiKey, status, lastHeartbeat)
+    VALUES (?, ?, ?, ?, ?, 'active', 0)
+  `).run(id, name, ip, domain || null, apiKey);
 
-  const installCommand = `curl -sL ${process.env.NEXT_PUBLIC_APP_URL || "https://spicypepper.app"}/api/node/install.sh | sudo bash -s -- --key ${apiKey} --master ${process.env.NEXT_PUBLIC_APP_URL || "https://spicypepper.app"}`;
+  let installCommand = `curl -sL ${process.env.NEXT_PUBLIC_APP_URL || "https://spicypepper.app"}/api/node/install.sh | sudo bash -s -- --key ${apiKey} --master ${process.env.NEXT_PUBLIC_APP_URL || "https://spicypepper.app"}`;
+  if (domain) {
+    installCommand += ` --domain ${domain}`;
+  }
 
   return NextResponse.json({ 
     id, 
     name, 
-    ip, 
+    ip,
+    domain,
     apiKey, 
     installCommand 
   });

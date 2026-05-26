@@ -33,6 +33,7 @@ export async function GET(req: Request) {
     const bestNode = getBestNode();
     const targetNodeId = bestNode ? bestNode.id : 'node-1';
     const targetNodeIp = bestNode ? bestNode.ip : '140.245.13.64';
+    const targetNodeDomain = bestNode ? bestNode.domain : null;
 
     // Update the user's assignment in the database so the tracker picks them up
     if (config.nodeId !== targetNodeId) {
@@ -45,11 +46,18 @@ export async function GET(req: Request) {
     db.prepare(`UPDATE token_devices SET lastSeen = ? WHERE token = ? AND ip = ?`).run(now, token, clientIp);
 
     // Return the VLESS + gRPC connection link directly as the subscription content
-    // using the dynamically assigned node IP. 
-    // If it's a remote node, we must allow insecure TLS because they use self-signed certificates.
     const userName = config.name ? config.name.split(" ")[0] : "User";
-    const allowInsecure = targetNodeId === 'node-1' ? '' : '&allowInsecure=1';
-    const vlessLink = `vless://${config.uuid}@${targetNodeIp}:8444?security=tls&sni=spicypepper.app&alpn=h2,http/1.1&fp=chrome&type=grpc&serviceName=spicypepper-grpc${allowInsecure}#SpicyVPN-${userName}`;
+    
+    let vlessLink = "";
+    if (targetNodeDomain) {
+      // CADDY PROXY MODE: Port 443, Real SSL, No allowInsecure
+      vlessLink = `vless://${config.uuid}@${targetNodeDomain}:443?security=tls&sni=${targetNodeDomain}&alpn=h2,http/1.1&fp=chrome&type=grpc&serviceName=spicypepper-grpc#SpicyVPN-${userName}`;
+    } else {
+      // RAW IP MODE: Port 8444, Self-Signed SSL, allowInsecure=1
+      const allowInsecure = targetNodeId === 'node-1' ? '' : '&allowInsecure=1';
+      vlessLink = `vless://${config.uuid}@${targetNodeIp}:8444?security=tls&sni=spicypepper.app&alpn=h2,http/1.1&fp=chrome&type=grpc&serviceName=spicypepper-grpc${allowInsecure}#SpicyVPN-${userName}`;
+    }
+    
     const base64Data = Buffer.from(vlessLink).toString('base64');
 
     return new Response(base64Data, {

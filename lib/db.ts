@@ -83,6 +83,7 @@ function initSchema(db: Database.Database) {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       ip TEXT UNIQUE NOT NULL,
+      domain TEXT DEFAULT NULL,
       apiKey TEXT UNIQUE NOT NULL,
       maxCapacity INTEGER DEFAULT 100,
       currentLoad INTEGER DEFAULT 0,
@@ -151,6 +152,9 @@ function initSchema(db: Database.Database) {
     }
     if (!nodeColumns.includes("liveUsers")) {
       db.exec("ALTER TABLE nodes ADD COLUMN liveUsers INTEGER DEFAULT 0;");
+    }
+    if (!nodeColumns.includes("domain")) {
+      db.exec("ALTER TABLE nodes ADD COLUMN domain TEXT DEFAULT NULL;");
     }
 
     // Insert default node if nodes table is empty

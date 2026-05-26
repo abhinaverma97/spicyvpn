@@ -171,27 +171,33 @@ export default function Dashboard({ user }: { user: User }) {
       {/* Main */}
       <main className="relative z-10 max-w-5xl mx-auto px-6 py-12">
 
-        {/* Update Alert */}
-        <GlassCard 
-          className="mb-8 border-emerald-500/20 bg-emerald-500/5 p-4 flex items-center justify-between gap-4"
-          intensity={0.1}
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
-              <Monitor className="w-5 h-5 text-emerald-400" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-emerald-400 uppercase tracking-widest">Update Available</h4>
-              <p className="text-white/60 text-xs">New SpicyVPN Desktop v1.0.68 is now available with high-performance node support.</p>
-            </div>
-          </div>
+        {/* Sleek Update Alert */}
+        <div className="mb-8 group">
           <a 
             href="https://github.com/abhinaverma97/spicyvpn-desktop/releases/download/v1.0.68/SpicyVPN_1.0.68_x64-setup.exe"
-            className="text-[10px] font-black uppercase tracking-[0.2em] bg-emerald-500 text-black px-4 py-2 rounded-lg hover:bg-emerald-400 transition-colors"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block"
           >
-            Update Now
+            <GlassCard 
+              className="p-4 border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-all duration-500 group-hover:border-emerald-500/30 flex items-center justify-between"
+              intensity={0.03}
+            >
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                  <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">New Update</span>
+                </div>
+                <p className="text-[11px] font-bold text-white/40 uppercase tracking-[0.1em]">
+                  SpicyVPN Desktop <span className="text-white/80">v1.0.68</span> is now available
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-white/20 group-hover:text-emerald-400 transition-colors">
+                <span className="text-[9px] font-black uppercase tracking-widest hidden sm:block">Download Setup</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </div>
+            </GlassCard>
           </a>
-        </GlassCard>
+        </div>
 
         <div className="mb-10">
           <h1 className="text-3xl font-black mb-2 tracking-tight">Your VPN Access</h1>

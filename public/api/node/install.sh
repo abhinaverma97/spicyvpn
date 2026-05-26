@@ -8,10 +8,12 @@ set -e
 echo "🌶️ SpicyVPN High-Performance Installer - Starting..."
 
 # Parse arguments
+NODE_DOMAIN=""
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --key) NODE_KEY="$2"; shift ;;
         --master) MASTER_URL="$2"; shift ;;
+        --domain) NODE_DOMAIN="$2"; shift ;;
     esac
     shift
 done
@@ -33,13 +35,21 @@ echo "✅ Detected architecture: $ARCH"
 
 # Update and install basic dependencies
 echo "🛠️ Installing dependencies..."
-apt-get update && apt-get install -y curl unzip jq iptables-persistent
+apt-get update && apt-get install -y curl unzip jq iptables-persistent apt-transport-https debian-archive-keyring debian-keyring
 
 # Install Node.js (Minimal LTS) if not present
 if ! command -v node &> /dev/null; then
     echo "📦 Installing Node.js Runtime..."
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
     apt-get install -y nodejs
+fi
+
+# Install Caddy if domain provided
+if [ ! -z "$NODE_DOMAIN" ]; then
+    echo "🌐 Installing Caddy for $NODE_DOMAIN..."
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg || true
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list || true
+    apt-get update && apt-get install -y caddy
 fi
 
 # Oracle Cloud / Ubuntu Firewall setup
@@ -49,6 +59,7 @@ iptables -I INPUT 1 -p tcp --dport 8444 -j ACCEPT
 iptables -I INPUT 1 -p udp --dport 8444 -j ACCEPT
 iptables -I INPUT 1 -p tcp --dport 80 -j ACCEPT
 iptables -I INPUT 1 -p tcp --dport 443 -j ACCEPT
+iptables -I INPUT 1 -p udp --dport 443 -j ACCEPT
 
 mkdir -p /etc/iptables
 iptables-save > /etc/iptables/rules.v4
@@ -65,13 +76,55 @@ mkdir -p /usr/local/etc/xray /usr/local/bin
 unzip -o xray.zip -d /usr/local/bin
 rm xray.zip
 
-# Create Self-Signed SSL Certificate for Stealth TLS
-echo "🔐 Generating Self-Signed TLS Certificates..."
-mkdir -p /usr/local/etc/xray/certs
-openssl req -x509 -newkey rsa:4096 -keyout /usr/local/etc/xray/certs/key.pem -out /usr/local/etc/xray/certs/cert.pem -sha256 -days 3650 -nodes -subj "/CN=spicypepper.app" &>/dev/null
+# Create basic Xray config
+if [ ! -z "$NODE_DOMAIN" ]; then
+    # CADDY PROXY MODE (Listen locally, no TLS in Xray)
+    cat <<EOF > /etc/caddy/Caddyfile
+$NODE_DOMAIN {
+    reverse_proxy / spicypepper-grpc {
+        to h2c://127.0.0.1:8444
+    }
+}
+EOF
+    systemctl restart caddy
 
-# Create basic Xray config with TLS enabled
-cat <<EOF > /usr/local/etc/xray/config.json
+    cat <<EOF > /usr/local/etc/xray/config.json
+{
+    "log": { "loglevel": "warning" },
+    "api": { "tag": "api", "services": ["HandlerService", "StatsService"] },
+    "stats": {},
+    "policy": {
+        "levels": { "0": { "statsUserUplink": true, "statsUserDownlink": true } },
+        "system": { "statsInboundUplink": true, "statsInboundDownlink": true }
+    },
+    "routing": {
+        "rules": [{ "inboundTag": ["api"], "outboundTag": "api", "type": "field" }]
+    },
+    "inbounds": [
+        {
+            "listen": "127.0.0.1", "port": 10085, "protocol": "dokodemo-door",
+            "settings": { "address": "127.0.0.1" }, "tag": "api"
+        },
+        {
+            "listen": "127.0.0.1", "port": 8444, "protocol": "vless", "tag": "vless-grpc",
+            "settings": { "clients": [], "decryption": "none" },
+            "streamSettings": {
+                "network": "grpc", 
+                "security": "none",
+                "grpcSettings": { "serviceName": "spicypepper-grpc" }
+            }
+        }
+    ],
+    "outbounds": [{ "protocol": "freedom", "tag": "direct" }, { "protocol": "blackhole", "tag": "api" }]
+}
+EOF
+else
+    # RAW IP MODE (Self-Signed TLS)
+    echo "🔐 Generating Self-Signed TLS Certificates..."
+    mkdir -p /usr/local/etc/xray/certs
+    openssl req -x509 -newkey rsa:4096 -keyout /usr/local/etc/xray/certs/key.pem -out /usr/local/etc/xray/certs/cert.pem -sha256 -days 3650 -nodes -subj "/CN=spicypepper.app" &>/dev/null
+
+    cat <<EOF > /usr/local/etc/xray/config.json
 {
     "log": { "loglevel": "warning" },
     "api": { "tag": "api", "services": ["HandlerService", "StatsService"] },
@@ -108,6 +161,7 @@ cat <<EOF > /usr/local/etc/xray/config.json
     "outbounds": [{ "protocol": "freedom", "tag": "direct" }, { "protocol": "blackhole", "tag": "api" }]
 }
 EOF
+fi
 
 # Setup Agent Configuration
 echo "🔥 Setting up SpicyAgent..."

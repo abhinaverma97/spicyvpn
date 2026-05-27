@@ -7,7 +7,7 @@ const MASTER_FILE = '/etc/spicyvpn/master';
 const STATE_FILE = '/etc/spicyvpn/state';
 const XRAY_API = '127.0.0.1:10085';
 
-console.log('🌶️ SpicyAgent Daemon starting (Robust Mode)...');
+console.log('🌶️ SpicyAgent Daemon starting (Master-Clone Robust Mode)...');
 
 if (!fs.existsSync(KEY_FILE) || !fs.existsSync(MASTER_FILE)) {
     console.error('Fatal: Missing configuration files in /etc/spicyvpn/');
@@ -81,21 +81,46 @@ async function sync() {
         const masterUsers = data.users || [];
         const masterTokens = masterUsers.map(u => u.token);
         const localTokens = fs.readFileSync(STATE_FILE, 'utf8').split('\n').filter(Boolean);
+        const isDomainMode = !!data.nodeDomain;
+
+        // 2. Incremental Sync
+        // We use incremental adds but ALWAYS re-apply the full inbound wrapper
+        // to ensure streamSettings (TLS/gRPC) are never stripped from Xray.
         
-        // 2. Incremental ADD (Safer than Batch)
+        const buildWrapper = (clients) => ({
+            inbounds: [{
+                port: 8444, 
+                protocol: "vless", 
+                tag: "vless-grpc",
+                listen: isDomainMode ? "127.0.0.1" : "0.0.0.0",
+                settings: { 
+                    decryption: "none",
+                    clients: clients
+                },
+                streamSettings: isDomainMode ? {
+                    network: "grpc",
+                    security: "none",
+                    grpcSettings: { serviceName: "spicypepper-grpc" }
+                } : {
+                    network: "grpc",
+                    security: "tls",
+                    tlsSettings: {
+                        alpn: ["h2"],
+                        certificates: [{
+                            certificateFile: "/usr/local/etc/xray/certs/cert.pem",
+                            keyFile: "/usr/local/etc/xray/certs/key.pem"
+                        }]
+                    },
+                    grpcSettings: { serviceName: "spicypepper-grpc" }
+                }
+            }]
+        });
+
+        // Add new users
         for (const user of masterUsers) {
             if (!localTokens.includes(user.token)) {
                 console.log(`[SYNC] Adding user: ${user.token}`);
-                // Inbound structure wrapper is required for 'adu' command to work correctly
-                const addJson = {
-                    inbounds: [{
-                        port: 8444, protocol: "vless", tag: "vless-grpc",
-                        settings: { 
-                            decryption: "none",
-                            clients: [{ id: user.uuid, email: user.token }] 
-                        }
-                    }]
-                };
+                const addJson = buildWrapper([{ id: user.uuid, email: user.token }]);
                 const tmpFile = `/tmp/add_${user.token}.json`;
                 fs.writeFileSync(tmpFile, JSON.stringify(addJson));
                 try {
@@ -106,7 +131,7 @@ async function sync() {
             }
         }
 
-        // 3. Incremental REMOVE
+        // Remove old users
         for (const token of localTokens) {
             if (!masterTokens.includes(token)) {
                 console.log(`[SYNC] Removing user: ${token}`);
@@ -118,7 +143,7 @@ async function sync() {
             }
         }
 
-        // 4. Report
+        // 4. Report Telemetry
         const { cpu, ram } = getStats();
         const trafficStats = getXrayStats();
         console.log(`[REPORT] CPU: ${cpu}% | RAM: ${ram}% | Users: ${masterUsers.length}`);

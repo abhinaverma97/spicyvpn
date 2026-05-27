@@ -78,11 +78,13 @@ rm xray.zip
 
 # Create basic Xray config
 if [ ! -z "$NODE_DOMAIN" ]; then
-    # CADDY PROXY MODE (Listen locally, no TLS in Xray)
-    echo "🏗️ Configuring Caddy Reverse Proxy for gRPC..."
+    # MASTER-CLONE CADDY PROXY MODE
+    echo "🏗️ Configuring Caddy (Master-Clone High-Performance Mode)..."
     cat <<EOF > /etc/caddy/Caddyfile
 $NODE_DOMAIN {
-    reverse_proxy /spicypepper-grpc/* h2c://127.0.0.1:8444
+    reverse_proxy h2c://127.0.0.1:8444 {
+        flush_interval -1
+    }
 }
 EOF
     systemctl restart caddy

@@ -184,14 +184,14 @@ export default function Dashboard({ user }: { user: User }) {
               intensity={0.03}
             >
               <div className="flex items-center gap-3 md:gap-4">
-                <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full shrink-0">
-                  <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">New Update</span>
+                <div className="flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/20 px-2 py-0.5 rounded-full shrink-0">
+                  <span className="text-[8px] font-black text-yellow-400 uppercase tracking-widest">New Update</span>
                 </div>
                 <p className="text-[10px] md:text-[11px] font-bold text-white/40 uppercase tracking-[0.1em]">
                   SpicyVPN Desktop <span className="text-white/80">v1.0.69</span> is now available
                 </p>
               </div>
-              <div className="flex items-center gap-2 text-white/20 group-hover:text-emerald-400 transition-colors ml-auto sm:ml-0">
+              <div className="flex items-center gap-2 text-white/20 group-hover:text-yellow-400 transition-colors ml-auto sm:ml-0">
                 <span className="text-[9px] font-black uppercase tracking-widest">Download Setup</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </div>

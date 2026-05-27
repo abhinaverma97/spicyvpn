@@ -33,30 +33,13 @@ esac
 
 echo "✅ Detected architecture: $ARCH"
 
-# Update and install basic dependencies
+# Install basic dependencies
 echo "🛠️ Installing dependencies..."
-apt-get update && apt-get install -y curl unzip jq iptables-persistent apt-transport-https debian-archive-keyring debian-keyring
-
-# Install Node.js (Minimal LTS) if not present
-if ! command -v node &> /dev/null; then
-    echo "📦 Installing Node.js Runtime..."
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-    apt-get install -y nodejs
-fi
-
-# Install Caddy if domain provided
-if [ ! -z "$NODE_DOMAIN" ]; then
-    echo "🌐 Installing Caddy for $NODE_DOMAIN..."
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg || true
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list || true
-    apt-get update && apt-get install -y caddy
-fi
+apt-get update && apt-get install -y curl unzip jq iptables-persistent certbot
 
 # Oracle Cloud / Ubuntu Firewall setup
 echo "🛡️ Configuring Firewall (iptables)..."
 iptables -I INPUT 1 -p icmp -j ACCEPT
-iptables -I INPUT 1 -p tcp --dport 8444 -j ACCEPT
-iptables -I INPUT 1 -p udp --dport 8444 -j ACCEPT
 iptables -I INPUT 1 -p tcp --dport 80 -j ACCEPT
 iptables -I INPUT 1 -p tcp --dport 443 -j ACCEPT
 iptables -I INPUT 1 -p udp --dport 443 -j ACCEPT
@@ -68,7 +51,7 @@ if command -v netfilter-persistent &> /dev/null; then
     netfilter-persistent reload
 fi
 
-# Install Xray
+# 📦 Install Xray-core
 echo "📦 Installing Xray-core..."
 XRAY_VERSION=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | jq -r .tag_name)
 curl -L -o xray.zip "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/Xray-linux-${XRAY_ARCH}.zip"
@@ -76,19 +59,18 @@ mkdir -p /usr/local/etc/xray /usr/local/bin
 unzip -o xray.zip -d /usr/local/bin
 rm xray.zip
 
-# Create basic Xray config
+# 🔐 SSL Certificate Management (Let's Encrypt)
 if [ ! -z "$NODE_DOMAIN" ]; then
-    # MASTER-CLONE CADDY PROXY MODE
-    echo "🏗️ Configuring Caddy (Master-Clone High-Performance Mode)..."
-    cat <<EOF > /etc/caddy/Caddyfile
-$NODE_DOMAIN {
-    reverse_proxy h2c://127.0.0.1:8444 {
-        flush_interval -1
-    }
-}
-EOF
-    systemctl restart caddy
-
+    echo "🔐 Obtaining real SSL certificates for $NODE_DOMAIN..."
+    # Stop anything on port 80 to let certbot work
+    systemctl stop caddy 2>/dev/null || true
+    
+    certbot certonly --standalone -d "$NODE_DOMAIN" --non-interactive --agree-tos --email webmaster@spicypepper.app
+    
+    CERT_PATH="/etc/letsencrypt/live/$NODE_DOMAIN/fullchain.pem"
+    KEY_PATH="/etc/letsencrypt/live/$NODE_DOMAIN/privkey.pem"
+    
+    # Configure Xray to use Port 443 with Real TLS
     cat <<EOF > /usr/local/etc/xray/config.json
 {
     "log": { "loglevel": "warning" },
@@ -107,11 +89,18 @@ EOF
             "settings": { "address": "127.0.0.1" }, "tag": "api"
         },
         {
-            "listen": "127.0.0.1", "port": 8444, "protocol": "vless", "tag": "vless-grpc",
+            "port": 443, "protocol": "vless", "tag": "vless-grpc",
             "settings": { "clients": [], "decryption": "none" },
             "streamSettings": {
                 "network": "grpc", 
-                "security": "none",
+                "security": "tls",
+                "tlsSettings": {
+                    "alpn": ["h2", "http/1.1"],
+                    "certificates": [{
+                        "certificateFile": "$CERT_PATH",
+                        "keyFile": "$KEY_PATH"
+                    }]
+                },
                 "grpcSettings": { "serviceName": "spicypepper-grpc" }
             }
         }
@@ -120,8 +109,8 @@ EOF
 }
 EOF
 else
-    # RAW IP MODE (Self-Signed TLS)
-    echo "🔐 Generating Self-Signed TLS Certificates..."
+    # FALLBACK: Port 8444 with Self-Signed (No Domain provided)
+    echo "🔐 No domain provided. Generating Self-Signed Certificates on Port 8444..."
     mkdir -p /usr/local/etc/xray/certs
     openssl req -x509 -newkey rsa:4096 -keyout /usr/local/etc/xray/certs/key.pem -out /usr/local/etc/xray/certs/cert.pem -sha256 -days 3650 -nodes -subj "/CN=spicypepper.app" &>/dev/null
 

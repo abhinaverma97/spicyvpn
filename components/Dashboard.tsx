@@ -174,25 +174,25 @@ export default function Dashboard({ user }: { user: User }) {
         {/* Sleek Update Alert */}
         <div className="mb-8 group">
           <a 
-            href="https://github.com/abhinaverma97/spicyvpn-desktop/releases/download/v1.0.68/SpicyVPN_1.0.68_x64-setup.exe"
+            href="https://github.com/abhinaverma97/spicyvpn-desktop/releases/download/v1.0.69/SpicyVPN_1.0.69_x64-setup.exe"
             target="_blank"
             rel="noopener noreferrer"
             className="block"
           >
             <GlassCard 
-              className="p-4 border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-all duration-500 group-hover:border-emerald-500/30 flex items-center justify-between"
+              className="p-3 md:p-4 border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-all duration-500 group-hover:border-emerald-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
               intensity={0.03}
             >
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+              <div className="flex items-center gap-3 md:gap-4">
+                <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full shrink-0">
                   <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">New Update</span>
                 </div>
-                <p className="text-[11px] font-bold text-white/40 uppercase tracking-[0.1em]">
-                  SpicyVPN Desktop <span className="text-white/80">v1.0.68</span> is now available
+                <p className="text-[10px] md:text-[11px] font-bold text-white/40 uppercase tracking-[0.1em]">
+                  SpicyVPN Desktop <span className="text-white/80">v1.0.69</span> is now available
                 </p>
               </div>
-              <div className="flex items-center gap-2 text-white/20 group-hover:text-emerald-400 transition-colors">
-                <span className="text-[9px] font-black uppercase tracking-widest hidden sm:block">Download Setup</span>
+              <div className="flex items-center gap-2 text-white/20 group-hover:text-emerald-400 transition-colors ml-auto sm:ml-0">
+                <span className="text-[9px] font-black uppercase tracking-widest">Download Setup</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </div>
             </GlassCard>
@@ -370,7 +370,7 @@ export default function Dashboard({ user }: { user: User }) {
                     <span className="text-lg font-bold text-white/80">Windows</span>
                     <div className="ml-auto flex gap-2">
                       <a
-                        href="https://github.com/abhinaverma97/spicyvpn-desktop/releases/download/v1.0.68/SpicyVPN_1.0.68_x64-setup.exe"
+                        href="https://github.com/abhinaverma97/spicyvpn-desktop/releases/download/v1.0.69/SpicyVPN_1.0.69_x64-setup.exe"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-sm font-bold px-4 py-2 rounded-xl border border-emerald-500/20 text-emerald-400 hover:border-emerald-500/40 hover:text-emerald-300 transition-all bg-emerald-500/5"

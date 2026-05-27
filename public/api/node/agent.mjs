@@ -45,7 +45,6 @@ function getStats() {
         const ram = (((os.totalmem() - os.freemem()) / os.totalmem()) * 100).toFixed(1);
         return { cpu, ram };
     } catch (e) {
-        console.error('Stats Collection Error:', e.message);
         return { cpu: "0.0", ram: "0.0" };
     }
 }
@@ -92,53 +91,58 @@ function getXrayStats() {
 
 async function sync() {
     try {
-        // 1. Fetch entire desired fleet state from Master
+        // 1. Fetch desired state
         const data = await fetchMaster('/api/node/sync');
         const masterUsers = data.users || [];
+        const isDomainMode = !!data.nodeDomain;
         
-        // 2. Perform Single Batch Update to Xray
-        // This replaces the entire user list and re-applies full TLS/gRPC settings
-        // to prevent "Security Stripping" and massive CPU spikes from process spawning.
+        // 2. Build High-Performance Batch Payload
+        const streamSettings = isDomainMode ? {
+            // DOMAIN MODE: Caddy handles TLS, Xray stays in plaintext h2c
+            network: "grpc",
+            security: "none",
+            grpcSettings: { serviceName: "spicypepper-grpc" }
+        } : {
+            // IP MODE: Local Xray handles Self-Signed TLS
+            network: "grpc",
+            security: "tls",
+            tlsSettings: {
+                alpn: ["h2"],
+                certificates: [{
+                    certificateFile: "/usr/local/etc/xray/certs/cert.pem",
+                    keyFile: "/usr/local/etc/xray/certs/key.pem"
+                }]
+            },
+            grpcSettings: { serviceName: "spicypepper-grpc" }
+        };
+
         const syncPayload = {
             inbounds: [{
                 port: 8444,
                 protocol: "vless",
                 tag: "vless-grpc",
+                // Listen locally in Domain mode to hide from direct scans
+                listen: isDomainMode ? "127.0.0.1" : "0.0.0.0",
                 settings: { 
                     decryption: "none",
                     clients: masterUsers.map(u => ({ id: u.uuid, email: u.token }))
                 },
-                streamSettings: {
-                    network: "grpc",
-                    security: "tls",
-                    tlsSettings: {
-                        alpn: ["h2"],
-                        certificates: [{
-                            certificateFile: "/usr/local/etc/xray/certs/cert.pem",
-                            keyFile: "/usr/local/etc/xray/certs/key.pem"
-                        }]
-                    },
-                    grpcSettings: {
-                        serviceName: "spicypepper-grpc"
-                    }
-                }
+                streamSettings
             }]
         };
 
         const tmpFile = '/tmp/xray_sync.json';
         fs.writeFileSync(tmpFile, JSON.stringify(syncPayload));
         try {
-            // Using 'adu' with a full inbound JSON overwrites the tag correctly in one go
             execSync(`xray api adu --server=${XRAY_API} ${tmpFile}`);
         } catch (e) {
             console.error('[!] Xray Batch Sync Failed:', e.message);
         }
         if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
 
-        // 3. Report Telemetry
+        // 3. Telemetry
         const { cpu, ram } = getStats();
         const trafficStats = getXrayStats();
-        
         console.log(`[REPORT] CPU: ${cpu}% | RAM: ${ram}% | Users: ${masterUsers.length}`);
         
         await fetchMaster('/api/node/report', 'POST', {
@@ -152,10 +156,7 @@ async function sync() {
     }
 }
 
-// Warm up CPU stats
 getStats();
-
-// High-performance loop
 setTimeout(() => {
     sync();
     setInterval(sync, 10000);

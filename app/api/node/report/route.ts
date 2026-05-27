@@ -62,7 +62,7 @@ export async function POST(req: Request) {
       // 3. Update Node Stats & Save current traffic as lastTraffic for next diff
       db.prepare(`
         UPDATE nodes 
-        SET cpuUsage = ?, ramUsage = ?, liveUsers = ?, lastHeartbeat = ?, status = 'active', lastTraffic = ?
+        SET cpuUsage = ?, ramUsage = ?, liveUsers = ?, lastHeartbeat = ?, lastTraffic = ?
         WHERE id = ?
       `).run(cpuUsage, ramUsage, calculatedLiveUsers, now, JSON.stringify(trafficStats || {}), node.id);
     })();

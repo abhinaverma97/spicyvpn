@@ -28,6 +28,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ 
       nodeName: node.name,
+      nodeDomain: node.domain,
       users: configs.map(c => ({
         uuid: c.uuid,
         token: c.token,

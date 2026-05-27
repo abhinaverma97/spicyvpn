@@ -23,49 +23,54 @@ async function syncAndTrack() {
     const now = Math.floor(Date.now() / 1000);
     const monthStr = new Date().toISOString().substring(0, 7);
 
-    // 1. Get all active users from DB assigned specifically to the master node
+    // 1. Get ALL currently active users assigned to the master node
     const activeUsers = db.prepare(`
       SELECT * FROM vpn_configs 
       WHERE active = 1 AND expiresAt > ? AND (totalUp + totalDown) < dataLimit
       AND (nodeId = 'node-1' OR nodeId IS NULL)
     `).all(now);
-    const activeTokens = new Set(activeUsers.map(u => u.token));
 
-    // 2. ADD NEW USERS to Xray
-    const newUsers = activeUsers.filter(u => !currentKnownTokens.has(u.token));
-    if (newUsers.length > 0) {
-      const clients = newUsers.map(user => ({
-        id: user.uuid,
-        email: user.token
-      }));
-      
-      for (const tag of INBOUND_TAGS) {
-        const userJson = {
-          inbounds: [{
-            port: 8444,
-            protocol: "vless",
-            tag: tag,
-            settings: {
-              decryption: "none",
-              clients: clients
+    // 2. Perform Declarative Batch Sync
+    // This pushes the entire desired state to Xray in one go.
+    for (const tag of INBOUND_TAGS) {
+      const userJson = {
+        inbounds: [{
+          port: 8444,
+          protocol: "vless",
+          tag: tag,
+          settings: {
+            decryption: "none",
+            clients: activeUsers.map(u => ({ id: u.uuid, email: u.token }))
+          },
+          streamSettings: {
+            network: "grpc",
+            security: "tls",
+            tlsSettings: {
+              alpn: ["h2"],
+              certificates: [{
+                certificateFile: "/usr/local/etc/xray/certs/spicypepper.app.crt",
+                keyFile: "/usr/local/etc/xray/certs/spicypepper.app.key"
+              }]
+            },
+            grpcSettings: {
+              serviceName: "spicypepper-grpc"
             }
-          }]
-        };
-        const tmpFile = `/tmp/sync_add_${tag}.json`;
-        fs.writeFileSync(tmpFile, JSON.stringify(userJson));
-        try {
-          execSync(`xray api adu --server=${XRAY_API} ${tmpFile}`);
-          console.log(`[SYNC] Added ${newUsers.length} users to ${tag}`);
-        } catch (e) {
-          console.error(`[SYNC] Failed to add to ${tag}:`, e.message);
-        }
-        if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
+          }
+        }]
+      };
+      
+      const tmpFile = `/tmp/sync_batch_${tag}.json`;
+      fs.writeFileSync(tmpFile, JSON.stringify(userJson));
+      try {
+        execSync(`xray api adu --server=${XRAY_API} ${tmpFile}`);
+      } catch (e) {
+        console.error(`[SYNC] Batch failed for ${tag}:`, e.message);
       }
-
-      for (const u of newUsers) {
-        currentKnownTokens.add(u.token);
-      }
+      if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
     }
+
+    // Update our internal memory of who is authorized
+    currentKnownTokens = new Set(activeUsers.map(u => u.token));
 
     // 3. Query stats
     let data;
@@ -131,20 +136,7 @@ async function syncAndTrack() {
       }
     })();
 
-    // 5. Cleanup loops
-    for (const token of [...currentKnownTokens]) {
-      if (!activeTokens.has(token)) {
-        console.log(`[CLEANUP] Removing deactivated user: ${token}`);
-        for (const tag of INBOUND_TAGS) {
-          try {
-            execSync(`xray api rmu --server=${XRAY_API} -tag=${tag} "${token}"`);
-          } catch (e) {}
-        }
-        currentKnownTokens.delete(token);
-      }
-    }
-
-    // 6. Update Master Node Telemetry (Heartbeat)
+    // 4. Update Master Node Telemetry (Heartbeat)
     const cpus = os.cpus();
     const load = os.loadavg();
     const totalMem = os.totalmem();

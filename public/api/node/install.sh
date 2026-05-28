@@ -37,6 +37,13 @@ echo "✅ Detected architecture: $ARCH"
 echo "🛠️ Installing dependencies..."
 apt-get update && apt-get install -y curl unzip jq iptables-persistent certbot
 
+# Install Node.js (Minimal LTS) if not present
+if ! command -v node &> /dev/null; then
+    echo "📦 Installing Node.js Runtime..."
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    apt-get install -y nodejs
+fi
+
 # Oracle Cloud / Ubuntu Firewall setup
 echo "🛡️ Configuring Firewall (iptables)..."
 iptables -I INPUT 1 -p icmp -j ACCEPT

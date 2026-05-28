@@ -8,12 +8,10 @@ set -e
 echo "🌶️ SpicyVPN High-Performance Installer - Starting..."
 
 # Parse arguments
-NODE_DOMAIN=""
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --key) NODE_KEY="$2"; shift ;;
         --master) MASTER_URL="$2"; shift ;;
-        --domain) NODE_DOMAIN="$2"; shift ;;
     esac
     shift
 done
@@ -35,7 +33,7 @@ echo "✅ Detected architecture: $ARCH"
 
 # Install basic dependencies
 echo "🛠️ Installing dependencies..."
-apt-get update && apt-get install -y curl unzip jq iptables-persistent certbot
+apt-get update && apt-get install -y curl unzip jq iptables-persistent
 
 # Install Node.js (Minimal LTS) if not present
 if ! command -v node &> /dev/null; then
@@ -47,9 +45,10 @@ fi
 # Oracle Cloud / Ubuntu Firewall setup
 echo "🛡️ Configuring Firewall (iptables)..."
 iptables -I INPUT 1 -p icmp -j ACCEPT
+iptables -I INPUT 1 -p tcp --dport 8444 -j ACCEPT
+iptables -I INPUT 1 -p udp --dport 8444 -j ACCEPT
 iptables -I INPUT 1 -p tcp --dport 80 -j ACCEPT
 iptables -I INPUT 1 -p tcp --dport 443 -j ACCEPT
-iptables -I INPUT 1 -p udp --dport 443 -j ACCEPT
 
 mkdir -p /etc/iptables
 iptables-save > /etc/iptables/rules.v4
@@ -66,62 +65,12 @@ mkdir -p /usr/local/etc/xray /usr/local/bin
 unzip -o xray.zip -d /usr/local/bin
 rm xray.zip
 
-# 🔐 SSL Certificate Management (Let's Encrypt)
-if [ ! -z "$NODE_DOMAIN" ]; then
-    echo "🔐 Obtaining real SSL certificates for $NODE_DOMAIN..."
-    # Stop anything on port 80 to let certbot work
-    systemctl stop caddy 2>/dev/null || true
-    
-    certbot certonly --standalone -d "$NODE_DOMAIN" --non-interactive --agree-tos --email webmaster@spicypepper.app
-    
-    CERT_PATH="/etc/letsencrypt/live/$NODE_DOMAIN/fullchain.pem"
-    KEY_PATH="/etc/letsencrypt/live/$NODE_DOMAIN/privkey.pem"
-    
-    # Configure Xray to use Port 443 with Real TLS
-    cat <<EOF > /usr/local/etc/xray/config.json
-{
-    "log": { "loglevel": "warning" },
-    "api": { "tag": "api", "services": ["HandlerService", "StatsService"] },
-    "stats": {},
-    "policy": {
-        "levels": { "0": { "statsUserUplink": true, "statsUserDownlink": true } },
-        "system": { "statsInboundUplink": true, "statsInboundDownlink": true }
-    },
-    "routing": {
-        "rules": [{ "inboundTag": ["api"], "outboundTag": "api", "type": "field" }]
-    },
-    "inbounds": [
-        {
-            "listen": "127.0.0.1", "port": 10085, "protocol": "dokodemo-door",
-            "settings": { "address": "127.0.0.1" }, "tag": "api"
-        },
-        {
-            "port": 443, "protocol": "vless", "tag": "vless-grpc",
-            "settings": { "clients": [], "decryption": "none" },
-            "streamSettings": {
-                "network": "grpc", 
-                "security": "tls",
-                "tlsSettings": {
-                    "alpn": ["h2", "http/1.1"],
-                    "certificates": [{
-                        "certificateFile": "$CERT_PATH",
-                        "keyFile": "$KEY_PATH"
-                    }]
-                },
-                "grpcSettings": { "serviceName": "spicypepper-grpc" }
-            }
-        }
-    ],
-    "outbounds": [{ "protocol": "freedom", "tag": "direct" }, { "protocol": "blackhole", "tag": "api" }]
-}
-EOF
-else
-    # FALLBACK: Port 8444 with Self-Signed (No Domain provided)
-    echo "🔐 No domain provided. Generating Self-Signed Certificates on Port 8444..."
-    mkdir -p /usr/local/etc/xray/certs
-    openssl req -x509 -newkey rsa:4096 -keyout /usr/local/etc/xray/certs/key.pem -out /usr/local/etc/xray/certs/cert.pem -sha256 -days 3650 -nodes -subj "/CN=spicypepper.app" &>/dev/null
+# 🔐 SSL Certificate Management (Self-Signed)
+echo "🔐 Generating Self-Signed TLS Certificates..."
+mkdir -p /usr/local/etc/xray/certs
+openssl req -x509 -newkey rsa:4096 -keyout /usr/local/etc/xray/certs/key.pem -out /usr/local/etc/xray/certs/cert.pem -sha256 -days 3650 -nodes -subj "/CN=spicypepper.app" &>/dev/null
 
-    cat <<EOF > /usr/local/etc/xray/config.json
+cat <<EOF > /usr/local/etc/xray/config.json
 {
     "log": { "loglevel": "warning" },
     "api": { "tag": "api", "services": ["HandlerService", "StatsService"] },
@@ -145,7 +94,7 @@ else
                 "network": "grpc", 
                 "security": "tls",
                 "tlsSettings": {
-                    "alpn": ["h2"],
+                    "alpn": ["h2", "http/1.1"],
                     "certificates": [{
                         "certificateFile": "/usr/local/etc/xray/certs/cert.pem",
                         "keyFile": "/usr/local/etc/xray/certs/key.pem"
@@ -158,7 +107,6 @@ else
     "outbounds": [{ "protocol": "freedom", "tag": "direct" }, { "protocol": "blackhole", "tag": "api" }]
 }
 EOF
-fi
 
 # Setup Agent Configuration
 echo "🔥 Setting up SpicyAgent..."
@@ -205,4 +153,3 @@ echo "📈 Current Node Telemetry (Live):"
 sleep 5
 journalctl -u spicy-agent -n 1 --no-pager
 echo "--------------------------------------------------"
-

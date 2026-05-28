@@ -50,7 +50,7 @@ export async function GET(req: Request) {
     
     let vlessLink = "";
     if (targetNodeDomain) {
-      // CADDY PROXY MODE: Port 443, Real SSL, No allowInsecure
+      // MASTER-PLUS MODE: Direct Xray on Port 443 with Real SSL (Certbot)
       vlessLink = `vless://${config.uuid}@${targetNodeDomain}:443?security=tls&sni=${targetNodeDomain}&alpn=h2,http/1.1&fp=chrome&type=grpc&serviceName=spicypepper-grpc#SpicyVPN-${userName}`;
     } else {
       // RAW IP MODE: Port 8444, Self-Signed SSL, allowInsecure=1

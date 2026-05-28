@@ -82,6 +82,7 @@ async function sync() {
         const masterTokens = masterUsers.map(u => u.token);
         const localTokens = fs.readFileSync(STATE_FILE, 'utf8').split('\n').filter(Boolean);
         const isDomainMode = !!data.nodeDomain;
+        const listenPort = isDomainMode ? 443 : 8444;
 
         // 2. Incremental Sync
         // We use incremental adds but ALWAYS re-apply the full inbound wrapper
@@ -89,26 +90,22 @@ async function sync() {
         
         const buildWrapper = (clients) => ({
             inbounds: [{
-                port: 8444, 
+                port: listenPort, 
                 protocol: "vless", 
                 tag: "vless-grpc",
-                listen: isDomainMode ? "127.0.0.1" : "0.0.0.0",
+                listen: "0.0.0.0",
                 settings: { 
                     decryption: "none",
                     clients: clients
                 },
-                streamSettings: isDomainMode ? {
-                    network: "grpc",
-                    security: "none",
-                    grpcSettings: { serviceName: "spicypepper-grpc" }
-                } : {
+                streamSettings: {
                     network: "grpc",
                     security: "tls",
                     tlsSettings: {
-                        alpn: ["h2"],
+                        alpn: ["h2", "http/1.1"],
                         certificates: [{
-                            certificateFile: "/usr/local/etc/xray/certs/cert.pem",
-                            keyFile: "/usr/local/etc/xray/certs/key.pem"
+                            certificateFile: isDomainMode ? `/etc/letsencrypt/live/${data.nodeDomain}/fullchain.pem` : "/usr/local/etc/xray/certs/cert.pem",
+                            keyFile: isDomainMode ? `/etc/letsencrypt/live/${data.nodeDomain}/privkey.pem` : "/usr/local/etc/xray/certs/key.pem"
                         }]
                     },
                     grpcSettings: { serviceName: "spicypepper-grpc" }

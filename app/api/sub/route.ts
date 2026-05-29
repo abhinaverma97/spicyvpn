@@ -33,7 +33,6 @@ export async function GET(req: Request) {
     const bestNode = getBestNode();
     const targetNodeId = bestNode ? bestNode.id : 'node-1';
     const targetNodeIp = bestNode ? bestNode.ip : '140.245.13.64';
-    const targetNodeDomain = bestNode ? bestNode.domain : null;
 
     // Update the user's assignment in the database so the tracker picks them up
     if (config.nodeId !== targetNodeId) {
@@ -46,17 +45,10 @@ export async function GET(req: Request) {
     db.prepare(`UPDATE token_devices SET lastSeen = ? WHERE token = ? AND ip = ?`).run(now, token, clientIp);
 
     // Return the VLESS + gRPC connection link directly as the subscription content
+    // using the dynamically assigned node IP. 
+    // All nodes now hold the exact same Real SSL Certificate synchronized from the Master.
     const userName = config.name ? config.name.split(" ")[0] : "User";
-    
-    let vlessLink = "";
-    if (targetNodeDomain) {
-      // MASTER-PLUS MODE: Direct Xray on Port 443 with Real SSL (Certbot)
-      vlessLink = `vless://${config.uuid}@${targetNodeDomain}:443?security=tls&sni=${targetNodeDomain}&alpn=h2,http/1.1&fp=chrome&type=grpc&serviceName=spicypepper-grpc#SpicyVPN-${userName}`;
-    } else {
-      // RAW IP MODE: Port 8444, Self-Signed SSL, allowInsecure=1
-      const allowInsecure = targetNodeId === 'node-1' ? '' : '&allowInsecure=1';
-      vlessLink = `vless://${config.uuid}@${targetNodeIp}:8444?security=tls&sni=spicypepper.app&alpn=h2,http/1.1&fp=chrome&type=grpc&serviceName=spicypepper-grpc${allowInsecure}#SpicyVPN-${userName}`;
-    }
+    const vlessLink = `vless://${config.uuid}@${targetNodeIp}:8444?security=tls&sni=spicypepper.app&alpn=h2,http/1.1&fp=chrome&type=grpc&serviceName=spicypepper-grpc#SpicyVPN-${userName}`;
     
     const base64Data = Buffer.from(vlessLink).toString('base64');
 

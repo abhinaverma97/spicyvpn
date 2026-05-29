@@ -1,5 +1,7 @@
 import { getDb } from "@/lib/db";
 import { NextResponse } from "next/server";
+import fs from "fs";
+import path from "path";
 
 export const dynamic = 'force-dynamic';
 
@@ -26,9 +28,20 @@ export async function GET(req: Request) {
       WHERE nodeId = ? AND active = 1 AND expiresAt > ? AND (totalUp + totalDown) < dataLimit
     `).all(node.id, now) as any[];
 
+    // Read Master SSL Certificates
+    let masterCert = "";
+    let masterKey = "";
+    try {
+      masterCert = fs.readFileSync("/usr/local/etc/xray/certs/spicypepper.app.crt", "utf8");
+      masterKey = fs.readFileSync("/usr/local/etc/xray/certs/spicypepper.app.key", "utf8");
+    } catch (e) {
+      console.warn("Could not read Master SSL certificates. Node will use fallback.");
+    }
+
     return NextResponse.json({ 
       nodeName: node.name,
-      nodeDomain: node.domain,
+      masterCert,
+      masterKey,
       users: configs.map(c => ({
         uuid: c.uuid,
         token: c.token,

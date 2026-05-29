@@ -150,17 +150,11 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
       if (!name) return;
       const ip = prompt("Enter Node Public IP:");
       if (!ip) return;
-      
-      const wantsDomain = confirm("Do you want to use a Custom Subdomain + Caddy (Recommended for Mobile)?\n\nClick OK for Yes, Cancel for Raw IP.");
-      let domain = "";
-      if (wantsDomain) {
-        domain = prompt("Enter Node Subdomain (e.g., sg1.spicypepper.app):\nMake sure you added the DNS A Record first!") || "";
-      }
 
       const res = await fetch("/api/admin/nodes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, ip, domain: domain || null })
+        body: JSON.stringify({ name, ip })
       });
 
       if (res.ok) {
@@ -514,7 +508,7 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
                                 {n.name}
                                 {n.id === 'node-1' && <Badge className="bg-blue-500/10 text-blue-400 text-[8px] uppercase px-1.5 py-0">Master</Badge>}
                               </p>
-                              <p className="text-[10px] text-white/30 truncate font-mono">{n.domain || n.ip}</p>
+                              <p className="text-[10px] text-white/30 truncate font-mono">{n.ip}</p>
                             </div>
                           </td>
                           <td className="px-6 py-4 text-center">

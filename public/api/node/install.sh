@@ -3,7 +3,7 @@ set -e
 
 # SpicyVPN Professional Node Installer
 # Multi-Architecture (x86_64 / ARM64)
-# Robust, Low-CPU Node.js Agent
+# High-Performance Node.js Agent (Raw IP Mode)
 
 echo "🌶️ SpicyVPN High-Performance Installer - Starting..."
 

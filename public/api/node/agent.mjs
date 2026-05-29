@@ -81,16 +81,25 @@ async function sync() {
         const masterUsers = data.users || [];
         const masterTokens = masterUsers.map(u => u.token);
         const localTokens = fs.readFileSync(STATE_FILE, 'utf8').split('\n').filter(Boolean);
-        const isDomainMode = !!data.nodeDomain;
-        const listenPort = isDomainMode ? 443 : 8444;
 
-        // 2. Incremental Sync
+        // 2. Synchronize SSL Certificates from Master
+        if (data.masterCert && data.masterKey) {
+            const currentCert = fs.existsSync('/usr/local/etc/xray/certs/cert.pem') ? fs.readFileSync('/usr/local/etc/xray/certs/cert.pem', 'utf8') : '';
+            if (currentCert !== data.masterCert) {
+                console.log('🔄 Master SSL Certificate update detected. Syncing to local node...');
+                fs.writeFileSync('/usr/local/etc/xray/certs/cert.pem', data.masterCert);
+                fs.writeFileSync('/usr/local/etc/xray/certs/key.pem', data.masterKey);
+                console.log('✅ SSL Sync complete.');
+            }
+        }
+
+        // 3. Incremental Sync
         // We use incremental adds but ALWAYS re-apply the full inbound wrapper
         // to ensure streamSettings (TLS/gRPC) are never stripped from Xray.
         
         const buildWrapper = (clients) => ({
             inbounds: [{
-                port: listenPort, 
+                port: 8444, 
                 protocol: "vless", 
                 tag: "vless-grpc",
                 listen: "0.0.0.0",
@@ -104,8 +113,8 @@ async function sync() {
                     tlsSettings: {
                         alpn: ["h2", "http/1.1"],
                         certificates: [{
-                            certificateFile: isDomainMode ? `/etc/letsencrypt/live/${data.nodeDomain}/fullchain.pem` : "/usr/local/etc/xray/certs/cert.pem",
-                            keyFile: isDomainMode ? `/etc/letsencrypt/live/${data.nodeDomain}/privkey.pem` : "/usr/local/etc/xray/certs/key.pem"
+                            certificateFile: "/usr/local/etc/xray/certs/cert.pem",
+                            keyFile: "/usr/local/etc/xray/certs/key.pem"
                         }]
                     },
                     grpcSettings: { serviceName: "spicypepper-grpc" }

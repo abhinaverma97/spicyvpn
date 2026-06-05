@@ -89,7 +89,13 @@ async function sync() {
                 console.log('🔄 Master SSL Certificate update detected. Syncing to local node...');
                 fs.writeFileSync('/usr/local/etc/xray/certs/cert.pem', data.masterCert);
                 fs.writeFileSync('/usr/local/etc/xray/certs/key.pem', data.masterKey);
-                console.log('✅ SSL Sync complete.');
+                console.log('✅ SSL files saved to disk. Restarting Xray to load into RAM...');
+                try {
+                    execSync('systemctl restart xray');
+                    console.log('✅ Xray restarted successfully.');
+                } catch (e) {
+                    console.error('❌ Failed to restart Xray:', e.message);
+                }
             }
         }
 

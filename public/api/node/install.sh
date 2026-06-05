@@ -148,8 +148,45 @@ systemctl daemon-reload
 systemctl enable xray spicy-agent
 systemctl restart xray spicy-agent
 
-echo "🚀 High-Performance Node successfully installed!"
-echo "📈 Current Node Telemetry (Live):"
-sleep 5
-journalctl -u spicy-agent -n 1 --no-pager
-echo "--------------------------------------------------"
+# Give the agent a few seconds to boot, fetch the real SSL certs, and restart Xray
+echo "⏳ Waiting for initial Agent Synchronization (10 seconds)..."
+sleep 10
+
+echo "=================================================="
+echo "🩺 POST-INSTALLATION HEALTH CHECK"
+echo "=================================================="
+
+# Check Xray Service
+if systemctl is-active --quiet xray; then
+    echo "✅ [Service] Xray VPN Engine is RUNNING."
+else
+    echo "❌ [Service] Xray failed to start! Check logs: journalctl -u xray"
+fi
+
+# Check Agent Service
+if systemctl is-active --quiet spicy-agent; then
+    echo "✅ [Service] SpicyAgent Daemon is RUNNING."
+else
+    echo "❌ [Service] SpicyAgent failed to start! Check logs: journalctl -u spicy-agent"
+fi
+
+# Check Port Binding
+if ss -tulpn | grep -q ":8444"; then
+    echo "✅ [Network] Xray successfully bound to Port 8444."
+else
+    echo "❌ [Network] Port 8444 is not listening! Xray might have crashed."
+fi
+
+# Check Master API Reachability
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X GET -H "Authorization: Bearer $NODE_KEY" "$MASTER_URL/api/node/sync")
+if [ "$HTTP_CODE" -eq 200 ]; then
+    echo "✅ [API] Node successfully communicated with Master Server."
+else
+    echo "❌ [API] Node could not reach Master Server. (HTTP Code: $HTTP_CODE). Check API Key or Network."
+fi
+
+echo "=================================================="
+echo "🚀 High-Performance Node successfully installed and validated!"
+echo "📈 First Telemetry Report:"
+journalctl -u spicy-agent -n 2 --no-pager | grep "REPORT" || echo "Waiting for first report..."
+echo "=================================================="

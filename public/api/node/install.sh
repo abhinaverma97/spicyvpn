@@ -33,7 +33,11 @@ echo "✅ Detected architecture: $ARCH"
 
 # Install basic dependencies
 echo "🛠️ Installing dependencies..."
-apt-get update && apt-get install -y curl unzip jq iptables-persistent
+if [ "$ARCH" = "x86_64" ]; then
+    DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y curl unzip jq iptables-persistent
+else
+    apt-get update && apt-get install -y curl unzip jq iptables-persistent
+fi
 
 # Install Node.js (Minimal LTS) if not present
 if ! command -v node &> /dev/null; then

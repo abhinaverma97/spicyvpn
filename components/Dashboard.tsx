@@ -171,38 +171,10 @@ export default function Dashboard({ user }: { user: User }) {
       {/* Main */}
       <main className="relative z-10 max-w-5xl mx-auto px-6 py-12">
 
-        {/* Sleek Update Alert */}
-        <div className="mb-8 group">
-          <a 
-            href="https://github.com/abhinaverma97/spicyvpn-desktop/releases/download/v1.0.69/SpicyVPN_1.0.69_x64-setup.exe"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block"
-          >
-            <GlassCard 
-              className="p-3 md:p-4 border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-all duration-500 group-hover:border-emerald-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
-              intensity={0.03}
-            >
-              <div className="flex items-center gap-3 md:gap-4">
-                <div className="flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/20 px-2 py-0.5 rounded-full shrink-0">
-                  <span className="text-[8px] font-black text-yellow-400 uppercase tracking-widest">New Update</span>
-                </div>
-                <p className="text-[10px] md:text-[11px] font-bold text-white/40 uppercase tracking-[0.1em]">
-                  SpicyVPN Desktop <span className="text-white/80">v1.0.69</span> is now available
-                </p>
-              </div>
-              <div className="flex items-center gap-2 text-white/20 group-hover:text-yellow-400 transition-colors ml-auto sm:ml-0">
-                <span className="text-[9px] font-black uppercase tracking-widest">Download Setup</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </div>
-            </GlassCard>
-          </a>
-        </div>
-
         <div className="mb-10">
           <h1 className="text-3xl font-black mb-2 tracking-tight">Your VPN Access</h1>
           <p className="text-white/40 text-lg">
-            {needsRenewal ? "Your previous plan has ended. Generate a new one below." : "Copy your subscription link and import it into Hiddify or SpicyVPN Desktop."}
+            {needsRenewal ? "Your previous plan has ended. Generate a new one below." : "Copy your subscription link and import it into our SpicyVPN Apps or Hiddify."}
           </p>
         </div>
 
@@ -330,32 +302,43 @@ export default function Dashboard({ user }: { user: User }) {
               <div className="p-8 pb-4">
                 <h3 className="text-xl font-bold text-white/90 mb-1">How to connect</h3>
                 <p className="text-white/40 text-base">
-                  Use <span className="text-white/70 font-bold underline decoration-white/20">Hiddify</span> or our SpicyVPN Desktop App
+                  Use our official <span className="text-white/70 font-bold underline decoration-white/20">SpicyVPN Apps</span> for the best experience
                 </p>
               </div>
               
               <div className="p-8 pt-0 space-y-8">
                 {/* Android */}
                 <div className="group/item">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center border border-white/10 group-hover/item:border-white/20 transition-colors">
-                      <Smartphone className="w-4 h-4 text-white/40" />
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center border border-white/10 group-hover/item:border-white/20 transition-colors">
+                        <Smartphone className="w-4 h-4 text-white/40" />
+                      </div>
+                      <span className="text-lg font-bold text-white/80">Android</span>
                     </div>
-                    <span className="text-lg font-bold text-white/80">Android</span>
-                    <a
-                      href="https://play.google.com/store/apps/details?id=app.hiddify.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="ml-auto text-sm font-bold px-4 py-2 rounded-xl border border-white/10 text-white/50 hover:border-white/30 hover:text-white transition-all bg-white/5"
-                    >
-                      Google Play
-                    </a>
+                    <div className="flex flex-wrap gap-2">
+                      <a
+                        href="https://play.google.com/store/apps/details?id=app.hiddify.com&hl=en_IN"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 sm:flex-none text-center text-sm font-bold px-4 py-2.5 rounded-xl border border-white/10 text-white/50 hover:border-white/30 hover:text-white transition-all bg-white/5"
+                      >
+                        Hiddify
+                      </a>
+                      <a
+                        href="https://github.com/abhinaverma97/spicyvpn-android/releases/download/v1.0.0/spicyvpn.apk"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 sm:flex-none text-center text-sm font-bold px-4 py-2.5 rounded-xl border border-emerald-500/20 text-emerald-400 hover:border-emerald-500/40 hover:text-emerald-300 transition-all bg-emerald-500/5"
+                      >
+                        SpicyVPN APK
+                      </a>
+                    </div>
                   </div>
                   <ol className="space-y-2 text-base text-white/30 ml-4 border-l border-white/5 pl-6">
-                    <li>1. Install <span className="text-white/60 font-medium">Hiddify</span> from Play Store</li>
-                    <li>2. Copy your link from the box above</li>
-                    <li>3. Open Hiddify → tap <span className="text-white/60 font-medium">+</span> → <span className="text-white/60 font-medium">Add from clipboard</span></li>
-                    <li>4. Tap <span className="text-white/60 font-medium">Connect</span></li>
+                    <li>1. Install <span className="text-white/60 font-medium">SpicyVPN</span> or <span className="text-white/60 font-medium">Hiddify</span></li>
+                    <li>2. Copy your subscription link from the box above</li>
+                    <li>3. Paste into the app and click <span className="text-white/60 font-medium">Connect</span></li>
                   </ol>
                 </div>
 
@@ -370,7 +353,7 @@ export default function Dashboard({ user }: { user: User }) {
                     <span className="text-lg font-bold text-white/80">Windows</span>
                     <div className="ml-auto flex gap-2">
                       <a
-                        href="https://github.com/abhinaverma97/spicyvpn-desktop/releases/download/v1.0.69/SpicyVPN_1.0.69_x64-setup.exe"
+                        href="https://github.com/abhinaverma97/spicyvpn-desktop/releases/download/v1.0.73/SpicyVPN_1.0.73_x64-setup.exe"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-sm font-bold px-4 py-2 rounded-xl border border-emerald-500/20 text-emerald-400 hover:border-emerald-500/40 hover:text-emerald-300 transition-all bg-emerald-500/5"
@@ -443,7 +426,7 @@ export default function Dashboard({ user }: { user: User }) {
             {/* Games & System Apps */}
             <GlassCard className="hidden md:flex flex-col h-full border-white/5" intensity={0.05}>
               <div className="p-8 pb-4">
-                <h3 className="text-xl font-bold text-white/90 mb-1">🎮 For games & system apps</h3>
+                <h3 className="text-xl font-bold text-white/90 mb-1">If you are using Hiddify</h3>
                 <p className="text-white/40 text-base leading-relaxed">Discord, Valorant, and any UDP app — enable VPN mode for full system routing</p>
               </div>
               <div className="p-8 pt-0 space-y-6 flex-1">
@@ -489,7 +472,7 @@ export default function Dashboard({ user }: { user: User }) {
             <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-4 flex items-center gap-3">
               <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
               <p className="text-base text-amber-400 font-medium">
-                Chrome/Brave might have issues, use Firefox.
+                Chrome/Brave might have issues if using Hiddify.
               </p>
             </div>
 

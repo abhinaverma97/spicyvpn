@@ -316,27 +316,17 @@ export default function Dashboard({ user }: { user: User }) {
                       </div>
                       <span className="text-lg font-bold text-white/80">Android</span>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <a
-                        href="https://play.google.com/store/apps/details?id=app.hiddify.com&hl=en_IN"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 sm:flex-none text-center text-sm font-bold px-4 py-2.5 rounded-xl border border-white/10 text-white/50 hover:border-white/30 hover:text-white transition-all bg-white/5"
-                      >
-                        Hiddify
-                      </a>
-                      <a
-                        href="https://github.com/abhinaverma97/spicyvpn-android/releases/download/v1.0.0/spicyvpn.apk"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 sm:flex-none text-center text-sm font-bold px-4 py-2.5 rounded-xl border border-emerald-500/20 text-emerald-400 hover:border-emerald-500/40 hover:text-emerald-300 transition-all bg-emerald-500/5"
-                      >
-                        SpicyVPN APK
-                      </a>
-                    </div>
+                    <a
+                      href="https://play.google.com/store/apps/details?id=app.hiddify.com&hl=en_IN"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm font-bold px-4 py-2.5 rounded-xl border border-white/10 text-white/50 hover:border-white/30 hover:text-white transition-all bg-white/5"
+                    >
+                      Hiddify
+                    </a>
                   </div>
                   <ol className="space-y-2 text-base text-white/30 ml-4 border-l border-white/5 pl-6">
-                    <li>1. Install <span className="text-white/60 font-medium">SpicyVPN</span> or <span className="text-white/60 font-medium">Hiddify</span></li>
+                    <li>1. Install <span className="text-white/60 font-medium">Hiddify</span></li>
                     <li>2. Copy your subscription link from the box above</li>
                     <li>3. Paste into the app and click <span className="text-white/60 font-medium">Connect</span></li>
                   </ol>

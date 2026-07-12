@@ -48,7 +48,7 @@ type User = {
 };
 
 type VpsStats = {
-  cpu: { pct: number; load1: string; cores: number };
+  cpu: { pct: number; load: string; cores: number };
   ram: { used: number; total: number; pct: number };
   disk: { used: number; total: number; pct: number };
   uptime: string;
@@ -320,6 +320,7 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em]">Engine Load</span>
                 <div className="text-xl font-bold text-white/80">{vps?.cpu.pct || 0}% <span className="text-[10px] text-white/20">CPU</span></div>
+                <div className="text-[11px] font-mono text-white/30">Load {vps?.cpu.load || '0.00'}</div>
               </div>
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em]">Memory</span>

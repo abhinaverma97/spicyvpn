@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import os from "os";
+import fs from "fs";
 import { exec } from "child_process";
 import { promisify } from "util";
 
@@ -10,6 +11,28 @@ const execAsync = promisify(exec);
 export const dynamic = 'force-dynamic';
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "abhinaverma97@gmail.com";
+
+function getCpuPct(): number {
+  try {
+    const stat = fs.readFileSync('/proc/stat', 'utf8');
+    const line = stat.split('\n').find(l => l.startsWith('cpu '));
+    if (!line) return 0;
+    const parts = line.trim().split(/\s+/).slice(1).map(Number);
+    const idle = parts[3] + parts[4];
+    const total = parts.reduce((a: number, b: number) => a + b, 0);
+
+    const prev = (globalThis as any)._lastCpuStats;
+    (globalThis as any)._lastCpuStats = { idle, total };
+
+    if (!prev || total <= prev.total) return 0;
+    const idleDiff = idle - prev.idle;
+    const totalDiff = total - prev.total;
+    if (totalDiff <= 0) return 0;
+    return Math.min(100, Math.max(0, Math.round((1 - idleDiff / totalDiff) * 100)));
+  } catch {
+    return 0;
+  }
+}
 
 function getUptime() {
   const seconds = os.uptime();
@@ -78,8 +101,8 @@ export async function GET() {
 
   return NextResponse.json({
     cpu: { 
-      pct: Math.round(load[0] * 100 / cpus.length), 
-      load1: load[0].toFixed(2),
+      pct: getCpuPct(), 
+      load: load[0].toFixed(2),
       cores: cpus.length 
     },
     ram: { 

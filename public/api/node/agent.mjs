@@ -100,30 +100,15 @@ async function sync() {
         }
 
         // 3. Incremental Sync
-        // We use incremental adds but ALWAYS re-apply the full inbound wrapper
-        // to ensure streamSettings (TLS/gRPC) are never stripped from Xray.
         
         const buildWrapper = (clients) => ({
             inbounds: [{
                 port: 8444, 
                 protocol: "vless", 
                 tag: "vless-grpc",
-                listen: "0.0.0.0",
                 settings: { 
                     decryption: "none",
                     clients: clients
-                },
-                streamSettings: {
-                    network: "grpc",
-                    security: "tls",
-                    tlsSettings: {
-                        alpn: ["h2", "http/1.1"],
-                        certificates: [{
-                            certificateFile: "/usr/local/etc/xray/certs/cert.pem",
-                            keyFile: "/usr/local/etc/xray/certs/key.pem"
-                        }]
-                    },
-                    grpcSettings: { serviceName: "spicypepper-grpc" }
                 }
             }]
         });

@@ -61,6 +61,17 @@ if command -v netfilter-persistent &> /dev/null; then
     netfilter-persistent reload
 fi
 
+# 🚀 Kernel TCP Tuning
+echo "🚀 Applying kernel TCP optimizations..."
+cat >> /etc/sysctl.conf <<EOF
+
+# SpicyVPN TCP tuning
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
+net.ipv4.tcp_fastopen = 3
+EOF
+sysctl -p
+
 # 📦 Install Xray-core
 echo "📦 Installing Xray-core..."
 XRAY_VERSION=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | jq -r .tag_name)

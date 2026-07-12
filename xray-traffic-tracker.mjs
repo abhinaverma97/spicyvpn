@@ -17,6 +17,30 @@ const INBOUND_TAGS = ['vless-grpc'];
 
 let previousStats = {}; 
 let currentKnownTokens = new Set(); 
+let pendingTraffic = {}; 
+let cycleCounter = 0; 
+
+function flushTraffic() {
+  const entries = Object.entries(pendingTraffic);
+  if (entries.length === 0) return;
+  const now = Math.floor(Date.now() / 1000);
+  const monthStr = new Date().toISOString().substring(0, 7);
+  let totalUp = 0, totalDown = 0;
+
+  db.transaction(() => {
+    for (const [token, t] of entries) {
+      db.prepare(`UPDATE vpn_configs SET totalUp = totalUp + ?, totalDown = totalDown + ?, lastActive = ? WHERE token = ?`)
+        .run(t.up, t.down, t.lastActive, token);
+      totalUp += t.up;
+      totalDown += t.down;
+    }
+    db.prepare(`INSERT OR IGNORE INTO monthly_stats (month, totalUp, totalDown) VALUES (?, 0, 0)`).run(monthStr);
+    db.prepare(`UPDATE monthly_stats SET totalUp = totalUp + ?, totalDown = totalDown + ? WHERE month = ?`).run(totalUp, totalDown, monthStr);
+    db.prepare(`INSERT OR IGNORE INTO node_bandwidth (nodeId, month, totalUp, totalDown) VALUES ('node-1', ?, 0, 0)`).run(monthStr);
+    db.prepare(`UPDATE node_bandwidth SET totalUp = totalUp + ?, totalDown = totalDown + ? WHERE nodeId = 'node-1' AND month = ?`).run(totalUp, totalDown, monthStr);
+  })();
+  pendingTraffic = {};
+}
 
 async function syncAndTrack() {
   try {
@@ -100,32 +124,31 @@ async function syncAndTrack() {
       }
     }
 
-    db.transaction(() => {
-      for (const [token, stats] of Object.entries(currentBatch)) {
-        const prev = previousStats[token] || { tx: 0, rx: 0 };
-        let diffUp = stats.tx - prev.tx;
-        let diffDown = stats.rx - prev.rx;
+    // Accumulate traffic diffs in memory (flush to DB every 60s)
+    for (const [token, stats] of Object.entries(currentBatch)) {
+      const prev = previousStats[token] || { tx: 0, rx: 0 };
+      let diffUp = stats.tx - prev.tx;
+      let diffDown = stats.rx - prev.rx;
 
-        if (diffUp < 0) diffUp = stats.tx;
-        if (diffDown < 0) diffDown = stats.rx;
+      if (diffUp < 0) diffUp = stats.tx;
+      if (diffDown < 0) diffDown = stats.rx;
 
-        if (diffUp > 0 || diffDown > 0) {
-          db.prepare(`
-            UPDATE vpn_configs 
-            SET totalUp = totalUp + ?, totalDown = totalDown + ?, lastActive = ?
-            WHERE token = ?
-          `).run(diffUp, diffDown, now, token);
-
-          db.prepare(`INSERT OR IGNORE INTO monthly_stats (month, totalUp, totalDown) VALUES (?, 0, 0)`).run(monthStr);
-          db.prepare(`UPDATE monthly_stats SET totalUp = totalUp + ?, totalDown = totalDown + ? WHERE month = ?`).run(diffUp, diffDown, monthStr);
-          
-          db.prepare(`INSERT OR IGNORE INTO node_bandwidth (nodeId, month, totalUp, totalDown) VALUES ('node-1', ?, 0, 0)`).run(monthStr);
-          db.prepare(`UPDATE node_bandwidth SET totalUp = totalUp + ?, totalDown = totalDown + ? WHERE nodeId = 'node-1' AND month = ?`).run(diffUp, diffDown, monthStr);
-        }
+      if (diffUp > 0 || diffDown > 0) {
+        pendingTraffic[token] = pendingTraffic[token] || { up: 0, down: 0, lastActive: 0 };
+        pendingTraffic[token].up += diffUp;
+        pendingTraffic[token].down += diffDown;
+        if (now > pendingTraffic[token].lastActive) pendingTraffic[token].lastActive = now;
       }
-    })();
+    }
 
-    // 5. Update Master Node Telemetry
+    // 5. Flush accumulated traffic to DB every 6 cycles (60s)
+    cycleCounter++;
+    if (cycleCounter >= 6) {
+      flushTraffic();
+      cycleCounter = 0;
+    }
+
+    // 6. Update Master Node Telemetry
     const cpus = os.cpus();
     const load = os.loadavg();
     const totalMem = os.totalmem();

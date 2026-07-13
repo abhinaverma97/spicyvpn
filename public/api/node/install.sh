@@ -63,14 +63,15 @@ fi
 
 # 🚀 Kernel TCP Tuning
 echo "🚀 Applying kernel TCP optimizations..."
-cat >> /etc/sysctl.conf <<EOF
-
+cat >> /etc/sysctl.d/99-spicyvpn.conf <<EOF
 # SpicyVPN TCP tuning
 net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
 net.ipv4.tcp_fastopen = 3
+net.ipv4.tcp_slow_start_after_idle = 0
+net.ipv4.tcp_notsent_lowat = 131072
 EOF
-sysctl -p
+sysctl -p /etc/sysctl.d/99-spicyvpn.conf
 
 # 📦 Install Xray-core
 echo "📦 Installing Xray-core..."

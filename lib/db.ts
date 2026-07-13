@@ -7,6 +7,8 @@ export function getDb(): Database.Database {
   if (!(globalThis as any)._db) {
     const db = new Database(DB_PATH);
     db.pragma("journal_mode = WAL");
+    db.pragma("synchronous = NORMAL");
+    db.pragma("cache_size = -64000");
     db.pragma("foreign_keys = ON");
     // Add busy timeout to prevent "database is locked" errors
     db.pragma("busy_timeout = 5000");

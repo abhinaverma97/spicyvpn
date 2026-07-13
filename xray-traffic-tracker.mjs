@@ -11,6 +11,7 @@ const dbPath = path.join(__dirname, 'prisma/dev.db');
 
 const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
+db.pragma('synchronous = NORMAL');
 
 const XRAY_API = '127.0.0.1:10085';
 const INBOUND_TAGS = ['vless-grpc'];
@@ -19,6 +20,27 @@ let previousStats = {};
 let currentKnownTokens = new Set(); 
 let pendingTraffic = {}; 
 let cycleCounter = 0; 
+let lastCpuStats = null;
+
+function getCpuPct() {
+  try {
+    const stat = fs.readFileSync('/proc/stat', 'utf8');
+    const line = stat.split('\n').find(l => l.startsWith('cpu '));
+    if (!line) return 0;
+    const parts = line.trim().split(/\s+/).slice(1).map(Number);
+    const idle = parts[3] + parts[4];
+    const total = parts.reduce((a, b) => a + b, 0);
+    const prev = lastCpuStats;
+    lastCpuStats = { idle, total };
+    if (!prev || total <= prev.total) return 0;
+    const idleDiff = idle - prev.idle;
+    const totalDiff = total - prev.total;
+    if (totalDiff <= 0) return 0;
+    return Math.min(100, Math.max(0, Math.round((1 - idleDiff / totalDiff) * 100)));
+  } catch {
+    return 0;
+  }
+}
 
 function flushTraffic() {
   const entries = Object.entries(pendingTraffic);
@@ -39,6 +61,20 @@ function flushTraffic() {
     db.prepare(`INSERT OR IGNORE INTO node_bandwidth (nodeId, month, totalUp, totalDown) VALUES ('node-1', ?, 0, 0)`).run(monthStr);
     db.prepare(`UPDATE node_bandwidth SET totalUp = totalUp + ?, totalDown = totalDown + ? WHERE nodeId = 'node-1' AND month = ?`).run(totalUp, totalDown, monthStr);
   })();
+  // Update Master Node Telemetry
+  const load = os.loadavg();
+  const totalMem = os.totalmem();
+  const freeMem = os.freemem();
+  const usedMem = totalMem - freeMem;
+  const ramPct = Math.round((usedMem / totalMem) * 100);
+  const liveUsersQuery = db.prepare(`SELECT COUNT(*) as count FROM vpn_configs WHERE lastActive >= ? AND (nodeId = 'node-1' OR nodeId IS NULL)`).get(now - 60);
+  const liveUsersCount = liveUsersQuery ? liveUsersQuery.count : 0;
+
+  db.prepare(`
+    UPDATE nodes 
+    SET lastHeartbeat = ?, cpuUsage = ?, ramUsage = ?, liveUsers = ?, status = 'active'
+    WHERE id = 'node-1'
+  `).run(now, getCpuPct(), ramPct, liveUsersCount);
   pendingTraffic = {};
 }
 
@@ -141,29 +177,12 @@ async function syncAndTrack() {
       }
     }
 
-    // 5. Flush accumulated traffic to DB every 6 cycles (60s)
+    // 5. Flush accumulated traffic to DB every 2 cycles (60s)
     cycleCounter++;
-    if (cycleCounter >= 6) {
+    if (cycleCounter >= 2) {
       flushTraffic();
       cycleCounter = 0;
     }
-
-    // 6. Update Master Node Telemetry
-    const cpus = os.cpus();
-    const load = os.loadavg();
-    const totalMem = os.totalmem();
-    const freeMem = os.freemem();
-    const usedMem = totalMem - freeMem;
-    const cpuPct = Math.round(load[0] * 100 / cpus.length);
-    const ramPct = Math.round((usedMem / totalMem) * 100);
-    const liveUsersQuery = db.prepare(`SELECT COUNT(*) as count FROM vpn_configs WHERE lastActive >= ? AND (nodeId = 'node-1' OR nodeId IS NULL)`).get(now - 60);
-    const liveUsersCount = liveUsersQuery ? liveUsersQuery.count : 0;
-
-    db.prepare(`
-      UPDATE nodes 
-      SET lastHeartbeat = ?, cpuUsage = ?, ramUsage = ?, liveUsers = ?, status = 'active'
-      WHERE id = 'node-1'
-    `).run(now, cpuPct, ramPct, liveUsersCount);
 
     previousStats = currentBatch;
   } catch (error) {
@@ -172,5 +191,5 @@ async function syncAndTrack() {
 }
 
 console.log("Starting Continuous Xray Sync & Tracker...");
-setInterval(syncAndTrack, 10000);
+setInterval(syncAndTrack, 30000);
 syncAndTrack();

@@ -44,8 +44,25 @@ function getCpuPct() {
 
 function flushTraffic() {
   const entries = Object.entries(pendingTraffic);
-  if (entries.length === 0) return;
   const now = Math.floor(Date.now() / 1000);
+
+  // Always update telemetry (even when no traffic to flush)
+  const load = os.loadavg();
+  const totalMem = os.totalmem();
+  const freeMem = os.freemem();
+  const usedMem = totalMem - freeMem;
+  const ramPct = Math.round((usedMem / totalMem) * 100);
+  const liveUsersQuery = db.prepare(`SELECT COUNT(*) as count FROM vpn_configs WHERE lastActive >= ? AND (nodeId = 'node-1' OR nodeId IS NULL)`).get(now - 60);
+  const liveUsersCount = liveUsersQuery ? liveUsersQuery.count : 0;
+
+  db.prepare(`
+    UPDATE nodes 
+    SET lastHeartbeat = ?, cpuUsage = ?, ramUsage = ?, liveUsers = ?, status = 'active'
+    WHERE id = 'node-1'
+  `).run(now, getCpuPct(), ramPct, liveUsersCount);
+
+  if (entries.length === 0) return;
+
   const monthStr = new Date().toISOString().substring(0, 7);
   let totalUp = 0, totalDown = 0;
 
@@ -61,20 +78,6 @@ function flushTraffic() {
     db.prepare(`INSERT OR IGNORE INTO node_bandwidth (nodeId, month, totalUp, totalDown) VALUES ('node-1', ?, 0, 0)`).run(monthStr);
     db.prepare(`UPDATE node_bandwidth SET totalUp = totalUp + ?, totalDown = totalDown + ? WHERE nodeId = 'node-1' AND month = ?`).run(totalUp, totalDown, monthStr);
   })();
-  // Update Master Node Telemetry
-  const load = os.loadavg();
-  const totalMem = os.totalmem();
-  const freeMem = os.freemem();
-  const usedMem = totalMem - freeMem;
-  const ramPct = Math.round((usedMem / totalMem) * 100);
-  const liveUsersQuery = db.prepare(`SELECT COUNT(*) as count FROM vpn_configs WHERE lastActive >= ? AND (nodeId = 'node-1' OR nodeId IS NULL)`).get(now - 60);
-  const liveUsersCount = liveUsersQuery ? liveUsersQuery.count : 0;
-
-  db.prepare(`
-    UPDATE nodes 
-    SET lastHeartbeat = ?, cpuUsage = ?, ramUsage = ?, liveUsers = ?, status = 'active'
-    WHERE id = 'node-1'
-  `).run(now, getCpuPct(), ramPct, liveUsersCount);
   pendingTraffic = {};
 }
 

@@ -16,7 +16,14 @@ db.pragma('synchronous = NORMAL');
 const XRAY_API = '127.0.0.1:10085';
 const INBOUND_TAGS = ['vless-grpc'];
 
-let previousStats = {}; 
+let savedState;
+try {
+  const row = db.prepare("SELECT lastTraffic FROM nodes WHERE id = 'node-1'").get() as any;
+  savedState = row?.lastTraffic ? JSON.parse(row.lastTraffic) : {};
+} catch (e) {
+  savedState = {};
+}
+let previousStats = savedState; 
 let currentKnownTokens = new Set(); 
 let pendingTraffic = {}; 
 let cycleCounter = 0; 
@@ -188,6 +195,7 @@ async function syncAndTrack() {
     }
 
     previousStats = currentBatch;
+    db.prepare("UPDATE nodes SET lastTraffic = ? WHERE id = 'node-1'").run(JSON.stringify(currentBatch));
   } catch (error) {
     console.error("Tracker error:", error.message);
   }

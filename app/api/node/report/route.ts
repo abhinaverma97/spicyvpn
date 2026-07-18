@@ -31,9 +31,10 @@ export async function POST(req: Request) {
       // 1. Compute diffs and update traffic for users assigned to this node
       if (trafficStats && typeof trafficStats === 'object') {
         for (const [token, stats] of Object.entries(trafficStats) as [string, any][]) {
-          const prev = prevTraffic[token as keyof typeof prevTraffic] || { uplink: 0, downlink: 0 };
-          let diffUp = (stats.uplink || 0) - (prev as any).uplink;
-          let diffDown = (stats.downlink || 0) - (prev as any).downlink;
+          const prev = prevTraffic[token as keyof typeof prevTraffic];
+          if (!prev) continue;
+          let diffUp = (stats.uplink || 0) - prev.uplink;
+          let diffDown = (stats.downlink || 0) - prev.downlink;
 
           // Handle Xray restarts (counters reset to 0)
           if (diffUp < 0) diffUp = stats.uplink || 0;

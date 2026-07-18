@@ -31,7 +31,7 @@ export async function POST(req: Request) {
       // 1. Compute diffs and update traffic for users assigned to this node
       if (trafficStats && typeof trafficStats === 'object') {
         for (const [token, stats] of Object.entries(trafficStats) as [string, any][]) {
-          const prev = prevTraffic[token as keyof typeof prevTraffic];
+          const prev = prevTraffic[token as keyof typeof prevTraffic] as any;
           if (!prev) continue;
           let diffUp = (stats.uplink || 0) - prev.uplink;
           let diffDown = (stats.downlink || 0) - prev.downlink;

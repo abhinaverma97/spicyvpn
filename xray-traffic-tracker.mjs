@@ -18,7 +18,7 @@ const INBOUND_TAGS = ['vless-grpc'];
 
 let savedState;
 try {
-  const row = db.prepare("SELECT lastTraffic FROM nodes WHERE id = 'node-1'").get() as any;
+  const row = db.prepare("SELECT lastTraffic FROM nodes WHERE id = 'node-1'").get();
   savedState = row?.lastTraffic ? JSON.parse(row.lastTraffic) : {};
 } catch (e) {
   savedState = {};

@@ -93,7 +93,7 @@ export default function Dashboard({ user }: { user: User }) {
 
   function subUrl() {
     if (!config) return "";
-    return `https://spicypepper.app/api/sub?token=${config.token}`;
+    return `https://proud-union-953f.octd258.workers.dev/?token=${config.token}`;
   }
 
   function copySubUrl() {

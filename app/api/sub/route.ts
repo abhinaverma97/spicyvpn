@@ -48,7 +48,7 @@ export async function GET(req: Request) {
     // using the dynamically assigned node IP. 
     // All nodes now hold the exact same Real SSL Certificate synchronized from the Master.
     const userName = config.name ? config.name.split(" ")[0] : "User";
-    const vlessLink = `vless://${config.uuid}@${targetNodeIp}:8444?security=tls&sni=spicypepper.app&alpn=h2,http/1.1&fp=chrome&type=grpc&serviceName=spicypepper-grpc#SpicyVPN-${userName}`;
+    const vlessLink = `vless://${config.uuid}@${targetNodeIp}:8444?security=tls&sni=google.com&alpn=h2,http/1.1&fp=chrome&type=grpc&serviceName=spicypepper-grpc&allowInsecure=1#SpicyVPN-${userName}`;
     
     const base64Data = Buffer.from(vlessLink).toString('base64');
 

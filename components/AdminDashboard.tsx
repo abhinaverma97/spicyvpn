@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { 
   Users, 
   Cpu, 
@@ -225,6 +226,14 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
 
   const liveCount = vps?.connections || 0;
 
+  const parentRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: sortedUsers.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 60,
+    overscan: 10,
+  });
+
   return (
     <div className="relative min-h-screen bg-black text-white overflow-x-hidden no-scrollbar">
       {/* Background Dither */}
@@ -387,88 +396,91 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[900px]">
-                  <thead className="bg-white/5 border-b border-white/5">
-                    <tr className="text-[10px] uppercase tracking-widest text-white/30 font-bold">
-                      <th className="px-6 py-3">Identity</th>
-                      <th className="px-6 py-3 text-center">Status</th>
-                      <th className="px-6 py-3">Data Consumed</th>
-                      <th className="px-6 py-3 text-right">Validity</th>
-                      <th className="px-6 py-3 text-right pr-6">Manage</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {sortedUsers.map((u, i) => {
-                      const isLive = vps?.liveUsers?.includes(u.token as string);
-                      const limit = u.dataLimit || (50 * 1024 * 1024 * 1024);
-                      const usagePct = (u.usedTraffic / limit) * 100;
-                      
-                      return (
-                        <tr key={i} className={`group transition-all duration-300 ${isLive ? 'bg-emerald-500/[0.02]' : 'hover:bg-white/[0.02]'}`}>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className={`w-8 h-8 rounded-lg border flex items-center justify-center font-bold text-sm shrink-0 transition-all duration-500 ${isLive ? 'bg-white border-white text-black scale-105 shadow-[0_0_15px_rgba(255,255,255,0.2)]' : 'bg-white/5 border-white/5 text-white/30'}`}>
-                                {u.name[0]}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-sm font-bold text-white/90 truncate">{u.name}</p>
-                                <p className="text-[10px] text-white/30 truncate font-mono">{u.email}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            {isLive ? (
-                              <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full">
-                                Live Now
-                              </Badge>
-                            ) : (
-                              <Badge className="bg-transparent text-white/20 border-white/5 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full">
-                                Offline
-                              </Badge>
-                            )}
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="w-40 space-y-1.5">
-                              <div className="flex justify-between text-[10px] font-bold">
-                                <span className={isLive ? "text-emerald-400" : "text-white/40"}>{fmt(u.usedTraffic)}</span>
-                                <span className="text-white/10 uppercase tracking-tighter italic">Cap {Math.floor(u.dataLimit / 1024 / 1024 / 1024)} GB</span>
-                              </div>
-                              <div className="h-1 bg-white/5 rounded-full overflow-hidden border border-white/5">
-                                <div 
-                                  className={`h-full transition-all duration-1000 ${usagePct > 90 ? 'bg-red-500' : isLive ? 'bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-white/20'}`} 
-                                  style={{ width: `${Math.min(100, usagePct)}%` }} 
-                                />
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <div className="inline-flex flex-col items-end">
-                              <p className={`text-xs font-bold ${daysLeft(u.expiresAt) === -2 || (daysLeft(u.expiresAt) !== -1 && daysLeft(u.expiresAt) < 3) ? 'text-red-400' : 'text-white/70'}`}>
-                                {daysLeft(u.expiresAt) === -1 ? 'NO PLAN' : daysLeft(u.expiresAt) === -2 ? 'EXPIRED' : daysLeft(u.expiresAt) === 0 ? '< 24 HOURS' : `${daysLeft(u.expiresAt)} DAYS`}
-                              </p>
-                              <p className="text-[9px] text-white/20 font-bold uppercase tracking-widest mt-0.5">Remaining</p>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-right pr-6">
-                            <div className="flex items-center justify-end">
-                              {confirmId === u.id ? (
-                                <div className="flex items-center gap-2 animate-in zoom-in-95">
-                                  <button onClick={() => deleteUser(u.id)} className="text-[9px] font-bold text-red-400 bg-red-400/10 px-2 py-1 rounded-lg border border-red-500/20 hover:bg-red-500/20 transition-all uppercase tracking-widest">Revoke</button>
-                                  <button onClick={() => setConfirmId(null)} className="text-[9px] font-bold text-white/30 uppercase px-2">Esc</button>
+              <div ref={parentRef} className="overflow-auto" style={{ height: '500px' }}>
+                <div style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', minWidth: '900px', position: 'relative' }}>
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-black/90 backdrop-blur-md sticky top-0 z-10">
+                      <tr className="text-[10px] uppercase tracking-widest text-white/30 font-bold">
+                        <th className="px-6 py-3">Identity</th>
+                        <th className="px-6 py-3 text-center">Status</th>
+                        <th className="px-6 py-3">Data Consumed</th>
+                        <th className="px-6 py-3 text-right">Validity</th>
+                        <th className="px-6 py-3 text-right pr-6">Manage</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {virtualizer.getVirtualItems().map((virtualItem) => {
+                        const u = sortedUsers[virtualItem.index];
+                        const isLive = vps?.liveUsers?.includes(u.token as string);
+                        const limit = u.dataLimit || (50 * 1024 * 1024 * 1024);
+                        const usagePct = (u.usedTraffic / limit) * 100;
+                        
+                        return (
+                          <tr key={u.id} style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualItem.start}px)` }}>
+                            <td className="px-6 py-4 border-b border-white/5">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-8 h-8 rounded-lg border flex items-center justify-center font-bold text-sm shrink-0 transition-all duration-500 ${isLive ? 'bg-white border-white text-black scale-105 shadow-[0_0_15px_rgba(255,255,255,0.2)]' : 'bg-white/5 border-white/5 text-white/30'}`}>
+                                  {u.name[0]}
                                 </div>
+                                <div className="min-w-0">
+                                  <p className="text-sm font-bold text-white/90 truncate">{u.name}</p>
+                                  <p className="text-[10px] text-white/30 truncate font-mono">{u.email}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-center border-b border-white/5">
+                              {isLive ? (
+                                <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full">
+                                  Live Now
+                                </Badge>
                               ) : (
-                                <button onClick={() => setConfirmId(u.id)} className="p-2 text-white/20 hover:text-red-400 hover:bg-white/5 rounded-lg transition-all">
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
+                                <Badge className="bg-transparent text-white/20 border-white/5 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full">
+                                  Offline
+                                </Badge>
                               )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            </td>
+                            <td className="px-6 py-4 border-b border-white/5">
+                              <div className="w-40 space-y-1.5">
+                                <div className="flex justify-between text-[10px] font-bold">
+                                  <span className={isLive ? "text-emerald-400" : "text-white/40"}>{fmt(u.usedTraffic)}</span>
+                                  <span className="text-white/10 uppercase tracking-tighter italic">Cap {Math.floor(u.dataLimit / 1024 / 1024 / 1024)} GB</span>
+                                </div>
+                                <div className="h-1 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                                  <div 
+                                    className={`h-full transition-all duration-1000 ${usagePct > 90 ? 'bg-red-500' : isLive ? 'bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-white/20'}`} 
+                                    style={{ width: `${Math.min(100, usagePct)}%` }} 
+                                  />
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-right border-b border-white/5">
+                              <div className="inline-flex flex-col items-end">
+                                <p className={`text-xs font-bold ${daysLeft(u.expiresAt) === -2 || (daysLeft(u.expiresAt) !== -1 && daysLeft(u.expiresAt) < 3) ? 'text-red-400' : 'text-white/70'}`}>
+                                  {daysLeft(u.expiresAt) === -1 ? 'NO PLAN' : daysLeft(u.expiresAt) === -2 ? 'EXPIRED' : daysLeft(u.expiresAt) === 0 ? '< 24 HOURS' : `${daysLeft(u.expiresAt)} DAYS`}
+                                </p>
+                                <p className="text-[9px] text-white/20 font-bold uppercase tracking-widest mt-0.5">Remaining</p>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-right border-b border-white/5">
+                              <div className="flex items-center justify-end">
+                                {confirmId === u.id ? (
+                                  <div className="flex items-center gap-2 animate-in zoom-in-95">
+                                    <button onClick={() => deleteUser(u.id)} className="text-[9px] font-bold text-red-400 bg-red-400/10 px-2 py-1 rounded-lg border border-red-500/20 hover:bg-red-500/20 transition-all uppercase tracking-widest">Revoke</button>
+                                    <button onClick={() => setConfirmId(null)} className="text-[9px] font-bold text-white/30 uppercase px-2">Esc</button>
+                                  </div>
+                                ) : (
+                                  <button onClick={() => setConfirmId(u.id)} className="p-2 text-white/20 hover:text-red-400 hover:bg-white/5 rounded-lg transition-all">
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
               
               {sortedUsers.length === 0 && (

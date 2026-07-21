@@ -91,6 +91,9 @@ export async function GET() {
   const liveFromDb = db.prepare(`SELECT token FROM vpn_configs WHERE lastActive >= ?`).all(ACTIVE_THRESHOLD) as any[];
   const liveUsers = liveFromDb.map((row: any) => row.token);
 
+  const past24h = now - 86400;
+  const userCountLog = db.prepare("SELECT ts, count FROM user_count_log WHERE ts >= ? ORDER BY ts ASC").all(past24h) as any[];
+
   // System Stats
   const cpus = os.cpus();
   const load = os.loadavg();
@@ -114,7 +117,8 @@ export async function GET() {
     uptime: getUptime(),
     network: { rx: totalDown, tx: totalUp }, 
     connections: liveConnections,
-    liveUsers: liveUsers, 
+    liveUsers: liveUsers,
+    userCountLog,
     vlessStatus: "active",
     totalUsers: totalUsersCount,
     activeUsers: activeConfigsCount,

@@ -19,6 +19,7 @@ import {
   Monitor,
   Clock
 } from "lucide-react";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -350,6 +351,39 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
               <div className="text-3xl font-black text-emerald-400 truncate">{fmt(vps?.totalTrafficBytes || 0)}</div>
             </GlassCard>
           </div>
+
+          {/* Live Users Chart */}
+          <GlassCard className="p-6 border-white/5" intensity={0.08}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold uppercase tracking-widest text-white/40">Live Users · 24h</h3>
+              <span className="text-[10px] text-white/20 uppercase tracking-widest font-mono">
+                {vps?.connections ?? 0} now
+              </span>
+            </div>
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={(vps?.userCountLog || []).map((d: any) => ({
+                  time: new Date(d.ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                  users: d.count
+                }))}>
+                  <defs>
+                    <linearGradient id="usersGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#34d399" stopOpacity={0.4} />
+                      <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="time" tick={{ fill: '#ffffff40', fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={50} />
+                  <YAxis tick={{ fill: '#ffffff40', fontSize: 10 }} axisLine={false} tickLine={false} width={32} allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '12px' }}
+                    labelStyle={{ color: '#ffffff80' }}
+                    itemStyle={{ color: '#34d399' }}
+                  />
+                  <Area type="monotone" dataKey="users" stroke="#34d399" fill="url(#usersGrad)" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: '#34d399' }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </GlassCard>
 
           {/* Tab Content */}
           {activeTab === "users" ? (

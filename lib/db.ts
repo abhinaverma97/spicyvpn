@@ -112,6 +112,11 @@ function initSchema(db: Database.Database) {
       PRIMARY KEY (nodeId, month),
       FOREIGN KEY (nodeId) REFERENCES nodes(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS user_count_log (
+      ts INTEGER PRIMARY KEY,
+      count INTEGER NOT NULL
+    );
   `);
 
   // Simple migrations for existing tables

@@ -68,6 +68,13 @@ function flushTraffic() {
     WHERE id = 'node-1'
   `).run(now, getCpuPct(), ramPct, liveUsersCount);
 
+  const fleetLiveQuery = db.prepare(`SELECT COUNT(*) as count FROM vpn_configs WHERE lastActive >= ?`).get(now - 60);
+  const fleetLiveCount = fleetLiveQuery ? fleetLiveQuery.count : 0;
+  const lastLog = db.prepare("SELECT ts FROM user_count_log ORDER BY ts DESC LIMIT 1").get();
+  if (!lastLog || now - lastLog.ts >= 300) {
+    db.prepare("INSERT OR IGNORE INTO user_count_log (ts, count) VALUES (?, ?)").run(now, fleetLiveCount);
+  }
+
   if (entries.length === 0) return;
 
   const monthStr = new Date().toISOString().substring(0, 7);

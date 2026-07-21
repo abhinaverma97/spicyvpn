@@ -19,7 +19,7 @@ import {
   Monitor,
   Clock
 } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -60,6 +60,7 @@ type VpsStats = {
   activeUsers: number;
   totalTrafficBytes: number;
   userCountLog: { ts: number; count: number }[];
+  monthlyBandwidth: { month: string; totalUp: number; totalDown: number }[];
 };
 
 function fmt(bytes: number) {
@@ -85,6 +86,7 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
   const [totalPages, setTotalPages] = useState(1);
   const [activeSubsCount, setActiveSubsCount] = useState(0);
   const [liveUsersCount, setLiveUsersCount] = useState(0);
+  const [bandwidthMonths, setBandwidthMonths] = useState(12);
 
   const refreshData = useCallback(async () => {
     setLoading(true);
@@ -353,38 +355,78 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
             </GlassCard>
           </div>
 
-          {/* Live Users Chart */}
-          <GlassCard className="p-6 border-white/5" intensity={0.08}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-white/40">Live Users · 24h</h3>
-              <span className="text-[10px] text-white/20 uppercase tracking-widest font-mono">
-                {vps?.connections ?? 0} now
-              </span>
-            </div>
-            <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={(vps?.userCountLog || []).map((d: any) => ({
-                  time: new Date(d.ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                  users: d.count
-                }))}>
-                  <defs>
-                    <linearGradient id="usersGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#34d399" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="time" tick={{ fill: '#ffffff40', fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={50} />
-                  <YAxis tick={{ fill: '#ffffff40', fontSize: 10 }} axisLine={false} tickLine={false} width={32} allowDecimals={false} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '12px' }}
-                    labelStyle={{ color: '#ffffff80' }}
-                    itemStyle={{ color: '#34d399' }}
-                  />
-                  <Area type="monotone" dataKey="users" stroke="#34d399" fill="url(#usersGrad)" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: '#34d399' }} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </GlassCard>
+          {/* Charts Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <GlassCard className="p-6 border-white/5" intensity={0.08}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-bold uppercase tracking-widest text-white/40">Live Users · 24h</h3>
+                <span className="text-[10px] text-white/20 uppercase tracking-widest font-mono">
+                  {vps?.connections ?? 0} now
+                </span>
+              </div>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={(vps?.userCountLog || []).map((d: any) => ({
+                    time: new Date(d.ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    users: d.count
+                  }))}>
+                    <defs>
+                      <linearGradient id="usersGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#34d399" stopOpacity={0.4} />
+                        <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="time" tick={{ fill: '#ffffff40', fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={50} />
+                    <YAxis tick={{ fill: '#ffffff40', fontSize: 10 }} axisLine={false} tickLine={false} width={32} allowDecimals={false} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '12px' }}
+                      labelStyle={{ color: '#ffffff80' }}
+                      itemStyle={{ color: '#34d399' }}
+                    />
+                    <Area type="monotone" dataKey="users" stroke="#34d399" fill="url(#usersGrad)" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: '#34d399' }} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </GlassCard>
+
+            <GlassCard className="p-6 border-white/5" intensity={0.08}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-bold uppercase tracking-widest text-white/40">Bandwidth History</h3>
+                <div className="flex gap-1">
+                  {[3, 6, 12, 24].map(n => (
+                    <button
+                      key={n}
+                      onClick={() => setBandwidthMonths(n)}
+                      className={`px-2 py-1 text-[10px] font-bold uppercase tracking-widest rounded-md transition-all ${
+                        bandwidthMonths === n ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-white/30 hover:text-white/60'
+                      }`}
+                    >
+                      {n}mo
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={(vps?.monthlyBandwidth || []).slice(-bandwidthMonths).map((d: any) => ({
+                    month: d.month.slice(5) + '/' + d.month.slice(2, 4),
+                    up: Math.round((d.totalUp || 0) / (1024 * 1024 * 1024) * 100) / 100,
+                    down: Math.round((d.totalDown || 0) / (1024 * 1024 * 1024) * 100) / 100
+                  }))} barCategoryGap="20%" barGap={0}>
+                    <XAxis dataKey="month" tick={{ fill: '#ffffff40', fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={30} />
+                    <YAxis tick={{ fill: '#ffffff40', fontSize: 10 }} axisLine={false} tickLine={false} width={40} tickFormatter={(v: number) => v + 'GB'} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '12px' }}
+                      labelStyle={{ color: '#ffffff80' }}
+                      formatter={(value: number, name: string) => [value + ' GB', name === 'up' ? 'Upload' : 'Download']}
+                    />
+                    <Bar dataKey="down" stackId="a" fill="#34d399" radius={[2, 2, 0, 0]} />
+                    <Bar dataKey="up" stackId="a" fill="#22d3ee" radius={[2, 2, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </GlassCard>
+          </div>
 
           {/* Tab Content */}
           {activeTab === "users" ? (

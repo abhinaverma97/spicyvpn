@@ -80,11 +80,10 @@ export async function GET() {
     SELECT (SELECT COUNT(*) FROM vpn_configs WHERE lastActive >= ?) as live_count
   `).get(ACTIVE_THRESHOLD) as any;
   
-  const monthStr = new Date().toISOString().substring(0, 7);
-  const monthlyRow = db.prepare("SELECT totalUp, totalDown FROM monthly_stats WHERE month = ?").get(monthStr) as any;
-  
-  const totalUp = monthlyRow?.totalUp || 0;
-  const totalDown = monthlyRow?.totalDown || 0;
+  const monthlyRows = db.prepare("SELECT month, totalUp, totalDown FROM monthly_stats ORDER BY month DESC LIMIT 24").all() as any[];
+  const currentMonth = monthlyRows[0] || { totalUp: 0, totalDown: 0 };
+  const totalUp = currentMonth.totalUp || 0;
+  const totalDown = currentMonth.totalDown || 0;
   const totalTraffic = totalUp + totalDown;
   const liveConnections = globalTraffic.live_count;
 
@@ -119,6 +118,7 @@ export async function GET() {
     connections: liveConnections,
     liveUsers: liveUsers,
     userCountLog,
+    monthlyBandwidth: monthlyRows.reverse(),
     vlessStatus: "active",
     totalUsers: totalUsersCount,
     activeUsers: activeConfigsCount,

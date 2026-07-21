@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { 
   Users, 
   Cpu, 
@@ -69,28 +69,43 @@ function fmt(bytes: number) {
 
 export default function AdminDashboard({ users: initialUsers, initialNodes = [] }: { users: User[], initialNodes?: any[] }) {
   const [mounted, setMounted] = useState(false);
-  const [users, setUsers] = useState<User[]>(initialUsers);
+  const [users, setUsers] = useState<User[]>(initialUsers.slice(0, 50));
   const [nodes, setNodes] = useState<any[]>(initialNodes);
   const [vps, setVps] = useState<VpsStats | null>(null);
   const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterType, setFilterType] = useState<"all" | "live" | "new" | "active">("all");
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"users" | "nodes">("users");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [activeSubsCount, setActiveSubsCount] = useState(0);
+  const [liveUsersCount, setLiveUsersCount] = useState(0);
 
-  async function refreshData() {
+  const refreshData = useCallback(async () => {
     setLoading(true);
     try {
+      const params = new URLSearchParams({ page: String(page), pageSize: "50" });
+      if (debouncedSearch) params.set("q", debouncedSearch);
+      if (filterType !== "all") params.set("filter", filterType);
+      if (filterType === "new") params.set("sort", "newest");
+
       const [vpsRes, usersRes, nodesRes] = await Promise.all([
         fetch("/api/admin/stats"),
-        fetch("/api/admin"),
+        fetch(`/api/admin?${params}`),
         fetch("/api/admin/nodes")
       ]);
 
       if (vpsRes.ok) setVps(await vpsRes.json());
       if (usersRes.ok) {
         const data = await usersRes.json();
-        setUsers(data);
+        setUsers(data.users || []);
+        setTotal(data.total || 0);
+        setTotalPages(data.totalPages || 1);
+        setActiveSubsCount(data.activeSubsCount || 0);
+        setLiveUsersCount(data.liveUsersCount || 0);
       }
       if (nodesRes.ok) {
         const data = await nodesRes.json();
@@ -101,14 +116,36 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
     } finally {
       setLoading(false);
     }
-  }
+  }, [page, debouncedSearch, filterType]);
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
     refreshData();
     const interval = setInterval(refreshData, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [refreshData]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  useEffect(() => {
+    if (mounted) setPage(1);
+  }, [filterType, debouncedSearch]);
+
+  function handleFilterChange(newFilter: typeof filterType) {
+    setFilterType(newFilter);
+  }
+
+  function handlePageChange(newPage: number) {
+    setPage(Math.max(1, Math.min(newPage, totalPages)));
+  }
 
   async function deleteUser(id: string) {
     await fetch("/api/admin", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: id }) });
@@ -180,48 +217,6 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
   }
 
   if (!mounted) return null;
-
-  const searchedUsers = users.filter(u => 
-    u.email.toLowerCase().includes(search.toLowerCase()) || 
-    u.name.toLowerCase().includes(search.toLowerCase()) ||
-    u.token?.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const DATA_LIMIT = 50 * 1024 * 1024 * 1024;
-  
-  const liveUsersCount = users.filter(u => vps?.liveUsers?.includes(u.token as string)).length;
-  const activeSubsCount = users.filter(u => {
-    if (!u.active || !u.expiresAt) return false;
-    const expiryMs = typeof u.expiresAt === 'number' ? u.expiresAt * 1000 : new Date(u.expiresAt).getTime();
-    const isTimeActive = expiryMs > Date.now();
-    const isDataActive = u.usedTraffic < (u.dataLimit > 0 ? u.dataLimit : DATA_LIMIT);
-    return isTimeActive && isDataActive;
-  }).length;
-
-  const filteredUsers = searchedUsers.filter(u => {
-    if (filterType === "live") return vps?.liveUsers?.includes(u.token as string);
-    if (filterType === "active") {
-      if (!u.active || !u.expiresAt) return false;
-      const expiryMs = typeof u.expiresAt === 'number' ? u.expiresAt * 1000 : new Date(u.expiresAt).getTime();
-      const isTimeActive = expiryMs > Date.now();
-      const isDataActive = u.usedTraffic < (u.dataLimit > 0 ? u.dataLimit : DATA_LIMIT);
-      return isTimeActive && isDataActive;
-    }
-    return true; // 'new' and 'all' show everyone
-  });
-
-  const sortedUsers = [...filteredUsers].sort((a, b) => {
-    // If 'new' is selected, override default sorting to sort by join date
-    if (filterType === "new") {
-      return new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime();
-    }
-    
-    // Default sorting: Live first, then by highest data usage
-    const aLive = vps?.liveUsers?.includes(a.token as string) ? 1 : 0;
-    const bLive = vps?.liveUsers?.includes(b.token as string) ? 1 : 0;
-    if (aLive !== bLive) return bLive - aLive;
-    return b.usedTraffic - a.usedTraffic;
-  });
 
   const liveCount = vps?.connections || 0;
 
@@ -366,10 +361,10 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
                 <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
                   <select 
                     value={filterType}
-                    onChange={e => setFilterType(e.target.value as any)}
+                    onChange={e => handleFilterChange(e.target.value as any)}
                     className="bg-black/40 border border-white/5 rounded-xl px-4 py-2.5 text-sm text-white/70 focus:border-white/20 outline-none transition-all cursor-pointer min-w-[160px]"
                   >
-                    <option value="all">All ({searchedUsers.length})</option>
+                    <option value="all">All ({total})</option>
                     <option value="live">Live Now ({liveUsersCount})</option>
                     <option value="active">Active Subs ({activeSubsCount})</option>
                     <option value="new">Sort by Newest</option>
@@ -380,8 +375,8 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
                       type="text"
                       placeholder="Filter users..."
                       className="w-full bg-black/40 border border-white/5 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white/70 focus:border-white/20 outline-none transition-all placeholder:text-white/10"
-                      value={search}
-                      onChange={e => setSearch(e.target.value)}
+                      value={searchInput}
+                      onChange={e => setSearchInput(e.target.value)}
                     />
                   </div>
                 </div>
@@ -399,7 +394,7 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {sortedUsers.map((u, i) => {
+                    {users.map((u, i) => {
                       const isLive = vps?.liveUsers?.includes(u.token as string);
                       const limit = u.dataLimit || (50 * 1024 * 1024 * 1024);
                       const usagePct = (u.usedTraffic / limit) * 100;
@@ -471,10 +466,62 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
                 </table>
               </div>
               
-              {sortedUsers.length === 0 && (
+              {users.length === 0 && (
                 <div className="p-24 text-center flex flex-col items-center gap-4 opacity-30">
                   <Shield className="w-12 h-12 mb-2" />
                   <p className="text-sm font-bold uppercase tracking-widest">Registry Search Empty</p>
+                </div>
+              )}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-6 py-4 border-t border-white/5">
+                  <div className="text-[11px] text-white/30 font-mono">
+                    {total === 0 ? '0 users' : `Showing ${(page - 1) * 50 + 1}-${Math.min(page * 50, total)} of ${total} users`}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handlePageChange(page - 1)}
+                      disabled={page <= 1}
+                      className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest rounded-lg border border-white/5 bg-white/5 text-white/70 hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
+                    >
+                      Prev
+                    </button>
+                    {(() => {
+                      const pages: (number | string)[] = [];
+                      const maxVisible = 5;
+                      let start = Math.max(1, page - Math.floor(maxVisible / 2));
+                      let end = Math.min(totalPages, start + maxVisible - 1);
+                      if (end - start + 1 < maxVisible) {
+                        start = Math.max(1, end - maxVisible + 1);
+                      }
+                      if (start > 1) pages.push("...");
+                      for (let i = start; i <= end; i++) pages.push(i);
+                      if (end < totalPages) pages.push("...");
+                      return pages.map((p, i) =>
+                        p === "..." ? (
+                          <span key={`ellipsis-${i}`} className="text-white/20 text-[11px] px-1">...</span>
+                        ) : (
+                          <button
+                            key={p}
+                            onClick={() => handlePageChange(p as number)}
+                            className={`w-7 h-7 text-[11px] font-bold rounded-lg transition-all ${
+                              p === page
+                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        )
+                      );
+                    })()}
+                    <button
+                      onClick={() => handlePageChange(page + 1)}
+                      disabled={page >= totalPages}
+                      className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest rounded-lg border border-white/5 bg-white/5 text-white/70 hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
               )}
             </GlassCard>

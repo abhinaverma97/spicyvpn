@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { 
   Users, 
   Cpu, 
@@ -43,8 +43,14 @@ type User = {
   token: string | null;
   expiresAt: string | null;
   active: boolean;
+  lastActive: number;
   usedTraffic: number;
   dataLimit: number;
+};
+
+type PageData = {
+  data: User[];
+  total: number;
 };
 
 type VpsStats = {
@@ -69,7 +75,8 @@ function fmt(bytes: number) {
 
 export default function AdminDashboard({ users: initialUsers, initialNodes = [] }: { users: User[], initialNodes?: any[] }) {
   const [mounted, setMounted] = useState(false);
-  const [users, setUsers] = useState<User[]>(initialUsers);
+  const [pageData, setPageData] = useState<PageData>({ data: initialUsers.slice(0, 50), total: initialUsers.length });
+  const [page, setPage] = useState(1);
   const [nodes, setNodes] = useState<any[]>(initialNodes);
   const [vps, setVps] = useState<VpsStats | null>(null);
   const [loading, setLoading] = useState(false);
@@ -78,19 +85,19 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"users" | "nodes">("users");
 
-  async function refreshData() {
+  const refreshData = useCallback(async () => {
     setLoading(true);
     try {
       const [vpsRes, usersRes, nodesRes] = await Promise.all([
         fetch("/api/admin/stats"),
-        fetch("/api/admin"),
+        fetch(`/api/admin?page=${page}`),
         fetch("/api/admin/nodes")
       ]);
 
       if (vpsRes.ok) setVps(await vpsRes.json());
       if (usersRes.ok) {
-        const data = await usersRes.json();
-        setUsers(data);
+        const result = await usersRes.json();
+        setPageData(result);
       }
       if (nodesRes.ok) {
         const data = await nodesRes.json();
@@ -101,18 +108,26 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
     } finally {
       setLoading(false);
     }
-  }
+  }, [page]);
 
   useEffect(() => {
     setMounted(true);
     refreshData();
-    const interval = setInterval(refreshData, 10000);
+  }, [refreshData]);
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const [vpsRes] = await Promise.all([
+        fetch("/api/admin/stats"),
+      ]);
+      if (vpsRes.ok) setVps(await vpsRes.json());
+    }, 10000);
     return () => clearInterval(interval);
   }, []);
 
   async function deleteUser(id: string) {
     await fetch("/api/admin", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: id }) });
-    setUsers(u => u.filter(x => x.id !== id));
+    setPageData(p => ({ ...p, data: p.data.filter(x => x.id !== id) }));
     setConfirmId(null);
   }
 
@@ -181,7 +196,7 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
 
   if (!mounted) return null;
 
-  const searchedUsers = users.filter(u => 
+  const searchedUsers = pageData.data.filter(u => 
     u.email.toLowerCase().includes(search.toLowerCase()) || 
     u.name.toLowerCase().includes(search.toLowerCase()) ||
     u.token?.toLowerCase().includes(search.toLowerCase())
@@ -189,8 +204,8 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
 
   const DATA_LIMIT = 50 * 1024 * 1024 * 1024;
   
-  const liveUsersCount = users.filter(u => vps?.liveUsers?.includes(u.token as string)).length;
-  const activeSubsCount = users.filter(u => {
+  const liveUsersCount = pageData.data.filter(u => vps?.liveUsers?.includes(u.token as string)).length;
+  const activeSubsCount = pageData.data.filter(u => {
     if (!u.active || !u.expiresAt) return false;
     const expiryMs = typeof u.expiresAt === 'number' ? u.expiresAt * 1000 : new Date(u.expiresAt).getTime();
     const isTimeActive = expiryMs > Date.now();
@@ -207,16 +222,13 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
       const isDataActive = u.usedTraffic < (u.dataLimit > 0 ? u.dataLimit : DATA_LIMIT);
       return isTimeActive && isDataActive;
     }
-    return true; // 'new' and 'all' show everyone
+    return true;
   });
 
   const sortedUsers = [...filteredUsers].sort((a, b) => {
-    // If 'new' is selected, override default sorting to sort by join date
     if (filterType === "new") {
       return new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime();
     }
-    
-    // Default sorting: Live first, then by highest data usage
     const aLive = vps?.liveUsers?.includes(a.token as string) ? 1 : 0;
     const bLive = vps?.liveUsers?.includes(b.token as string) ? 1 : 0;
     if (aLive !== bLive) return bLive - aLive;
@@ -224,6 +236,7 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
   });
 
   const liveCount = vps?.connections || 0;
+  const totalPages = Math.ceil(pageData.total / 50);
 
   return (
     <div className="relative min-h-screen bg-black text-white overflow-x-hidden no-scrollbar">
@@ -366,10 +379,10 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
                 <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
                   <select 
                     value={filterType}
-                    onChange={e => setFilterType(e.target.value as any)}
+                    onChange={e => { setFilterType(e.target.value as any); setPage(1); }}
                     className="bg-black/40 border border-white/5 rounded-xl px-4 py-2.5 text-sm text-white/70 focus:border-white/20 outline-none transition-all cursor-pointer min-w-[160px]"
                   >
-                    <option value="all">All ({searchedUsers.length})</option>
+                    <option value="all">All ({pageData.total})</option>
                     <option value="live">Live Now ({liveUsersCount})</option>
                     <option value="active">Active Subs ({activeSubsCount})</option>
                     <option value="new">Sort by Newest</option>
@@ -381,7 +394,7 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
                       placeholder="Filter users..."
                       className="w-full bg-black/40 border border-white/5 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white/70 focus:border-white/20 outline-none transition-all placeholder:text-white/10"
                       value={search}
-                      onChange={e => setSearch(e.target.value)}
+                      onChange={e => { setSearch(e.target.value); setPage(1); }}
                     />
                   </div>
                 </div>
@@ -475,6 +488,26 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
                 <div className="p-24 text-center flex flex-col items-center gap-4 opacity-30">
                   <Shield className="w-12 h-12 mb-2" />
                   <p className="text-sm font-bold uppercase tracking-widest">Registry Search Empty</p>
+                </div>
+              )}
+
+              {totalPages > 1 && (
+                <div className="p-4 border-t border-white/5 flex items-center justify-between">
+                  <span className="text-[10px] text-white/30 uppercase tracking-widest font-bold">
+                    Page {page} of {totalPages}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page <= 1}
+                      className="text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
+                    >Prev</button>
+                    <button
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      disabled={page >= totalPages}
+                      className="text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
+                    >Next</button>
+                  </div>
                 </div>
               )}
             </GlassCard>

@@ -59,6 +59,7 @@ type VpsStats = {
   totalUsers: number;
   activeUsers: number;
   totalTrafficBytes: number;
+  userCountLog: { ts: number; count: number }[];
 };
 
 function fmt(bytes: number) {

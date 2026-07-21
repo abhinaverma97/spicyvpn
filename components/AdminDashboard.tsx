@@ -19,7 +19,7 @@ import {
   Monitor,
   Clock
 } from "lucide-react";
-import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -372,18 +372,19 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
                   }))}>
                     <defs>
                       <linearGradient id="usersGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#34d399" stopOpacity={0.4} />
+                        <stop offset="0%" stopColor="#34d399" stopOpacity={0.35} />
                         <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <XAxis dataKey="time" tick={{ fill: '#ffffff40', fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={50} />
-                    <YAxis tick={{ fill: '#ffffff40', fontSize: 10 }} axisLine={false} tickLine={false} width={32} allowDecimals={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" />
+                    <XAxis dataKey="time" tick={{ fill: '#ffffff30', fontSize: 9 }} axisLine={{ stroke: '#ffffff08' }} tickLine={false} interval="preserveStartEnd" minTickGap={50} />
+                    <YAxis tick={{ fill: '#ffffff30', fontSize: 9 }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
                     <Tooltip
-                      contentStyle={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '12px' }}
-                      labelStyle={{ color: '#ffffff80' }}
+                      contentStyle={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '11px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}
+                      labelStyle={{ color: '#ffffff80', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.1em' }}
                       itemStyle={{ color: '#34d399' }}
                     />
-                    <Area type="monotone" dataKey="users" stroke="#34d399" fill="url(#usersGrad)" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: '#34d399' }} />
+                    <Area type="monotone" dataKey="users" stroke="#34d399" strokeWidth={2} fill="url(#usersGrad)" dot={false} activeDot={{ r: 4, fill: '#34d399', stroke: '#000', strokeWidth: 2 }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -392,13 +393,15 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
             <GlassCard className="p-6 border-white/5" intensity={0.08}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-bold uppercase tracking-widest text-white/40">Bandwidth History</h3>
-                <div className="flex gap-1">
+                <div className="flex gap-1.5">
                   {[3, 6, 12, 24].map(n => (
                     <button
                       key={n}
                       onClick={() => setBandwidthMonths(n)}
-                      className={`px-2 py-1 text-[10px] font-bold uppercase tracking-widest rounded-md transition-all ${
-                        bandwidthMonths === n ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-white/30 hover:text-white/60'
+                      className={`px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest rounded-lg transition-all ${
+                        bandwidthMonths === n
+                          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 shadow-[0_0_12px_rgba(52,211,153,0.08)]'
+                          : 'bg-black/40 text-white/30 border border-white/5 hover:text-white/60 hover:border-white/10'
                       }`}
                     >
                       {n}mo
@@ -407,23 +410,58 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
                 </div>
               </div>
               <div className="h-48">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={(vps?.monthlyBandwidth || []).slice(-bandwidthMonths).map((d: any) => ({
-                    month: d.month.slice(5) + '/' + d.month.slice(2, 4),
-                    up: Math.round((d.totalUp || 0) / (1024 * 1024 * 1024) * 100) / 100,
-                    down: Math.round((d.totalDown || 0) / (1024 * 1024 * 1024) * 100) / 100
-                  }))} barCategoryGap="20%" barGap={0}>
-                    <XAxis dataKey="month" tick={{ fill: '#ffffff40', fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={30} />
-                    <YAxis tick={{ fill: '#ffffff40', fontSize: 10 }} axisLine={false} tickLine={false} width={40} tickFormatter={(v: number) => v + 'GB'} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '12px' }}
-                      labelStyle={{ color: '#ffffff80' }}
-                      formatter={(value: number, name: string) => [value + ' GB', name === 'up' ? 'Upload' : 'Download']}
-                    />
-                    <Bar dataKey="down" stackId="a" fill="#34d399" radius={[2, 2, 0, 0]} />
-                    <Bar dataKey="up" stackId="a" fill="#22d3ee" radius={[2, 2, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                {(() => {
+                  const raw = (vps?.monthlyBandwidth || []).slice(-bandwidthMonths);
+                  const data = raw.map((d: any) => {
+                    const [y, m] = d.month.split('-');
+                    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                    const upGb = (d.totalUp || 0) / (1024 * 1024 * 1024);
+                    const downGb = (d.totalDown || 0) / (1024 * 1024 * 1024);
+                    return {
+                      month: months[parseInt(m) - 1] + " '" + y.slice(2),
+                      up: upGb,
+                      down: downGb,
+                      total: upGb + downGb
+                    };
+                  });
+                  const maxVal = Math.max(...data.map(d => d.total), 1);
+                  const unit = maxVal >= 1024 ? 'TB' : 'GB';
+                  const divisor = unit === 'TB' ? 1024 : 1;
+                  return (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={data.map(d => ({
+                        ...d,
+                        up: d.up / divisor,
+                        down: d.down / divisor,
+                        total: d.total / divisor
+                      }))} barCategoryGap="25%" barGap={0} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" />
+                        <XAxis dataKey="month" tick={{ fill: '#ffffff30', fontSize: 9 }} axisLine={{ stroke: '#ffffff08' }} tickLine={false} interval="preserveStartEnd" minTickGap={30} />
+                        <YAxis tick={{ fill: '#ffffff30', fontSize: 9 }} axisLine={false} tickLine={false} width={36} tickFormatter={(v: number) => Math.round(v * 10) / 10 + unit} />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '11px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}
+                          labelStyle={{ color: '#ffffff80', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.1em' }}
+                          formatter={(value: number, name: string) => [
+                            Math.round(value * 100) / 100 + ' ' + unit,
+                            name === 'total' ? 'Total' : name === 'down' ? 'Download' : 'Upload'
+                          ]}
+                        />
+                        <Bar dataKey="down" stackId="a" fill="#34d399" radius={[3, 3, 0, 0]} maxBarSize={32} />
+                        <Bar dataKey="up" stackId="a" fill="#22d3ee" radius={[3, 3, 0, 0]} maxBarSize={32} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  );
+                })()}
+              </div>
+              <div className="flex items-center justify-end gap-4 mt-3">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-[2px] bg-[#22d3ee]" />
+                  <span className="text-[9px] text-white/25 uppercase tracking-widest font-bold">Up</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-[2px] bg-[#34d399]" />
+                  <span className="text-[9px] text-white/25 uppercase tracking-widest font-bold">Down</span>
+                </div>
               </div>
             </GlassCard>
           </div>

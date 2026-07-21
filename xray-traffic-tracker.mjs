@@ -12,6 +12,7 @@ const dbPath = path.join(__dirname, 'prisma/dev.db');
 const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
 db.pragma('synchronous = NORMAL');
+db.exec(`CREATE TABLE IF NOT EXISTS user_count_log (ts INTEGER PRIMARY KEY, count INTEGER NOT NULL)`);
 
 const XRAY_API = '127.0.0.1:10085';
 const INBOUND_TAGS = ['vless-grpc'];

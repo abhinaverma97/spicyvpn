@@ -376,12 +376,12 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
                         <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" />
-                    <XAxis dataKey="time" tick={{ fill: '#ffffff30', fontSize: 9 }} axisLine={{ stroke: '#ffffff08' }} tickLine={false} interval="preserveStartEnd" minTickGap={50} />
-                    <YAxis tick={{ fill: '#ffffff30', fontSize: 9 }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" />
+                    <XAxis dataKey="time" tick={{ fill: '#ffffff20', fontSize: 9 }} axisLine={{ stroke: '#ffffff05' }} tickLine={false} interval="preserveStartEnd" minTickGap={50} />
+                    <YAxis tick={{ fill: '#ffffff20', fontSize: 9 }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
                     <Tooltip
-                      contentStyle={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '11px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}
-                      labelStyle={{ color: '#ffffff80', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.1em' }}
+                      contentStyle={{ backgroundColor: '#09090b', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', fontSize: '11px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}
+                      labelStyle={{ color: '#ffffff40', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.1em' }}
                       itemStyle={{ color: '#34d399' }}
                     />
                     <Area type="monotone" dataKey="users" stroke="#34d399" strokeWidth={2} fill="url(#usersGrad)" dot={false} activeDot={{ r: 4, fill: '#34d399', stroke: '#000', strokeWidth: 2 }} />
@@ -435,19 +435,20 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
                         down: d.down / divisor,
                         total: d.total / divisor
                       }))} barCategoryGap="25%" barGap={0} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" />
-                        <XAxis dataKey="month" tick={{ fill: '#ffffff30', fontSize: 9 }} axisLine={{ stroke: '#ffffff08' }} tickLine={false} interval="preserveStartEnd" minTickGap={30} />
-                        <YAxis tick={{ fill: '#ffffff30', fontSize: 9 }} axisLine={false} tickLine={false} width={36} tickFormatter={(v: number) => Math.round(v * 10) / 10 + unit} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" />
+                        <XAxis dataKey="month" tick={{ fill: '#ffffff20', fontSize: 9 }} axisLine={{ stroke: '#ffffff05' }} tickLine={false} interval="preserveStartEnd" minTickGap={30} />
+                        <YAxis tick={{ fill: '#ffffff20', fontSize: 9 }} axisLine={false} tickLine={false} width={36} tickFormatter={(v: number) => Math.round(v * 10) / 10 + unit} />
                         <Tooltip
-                          contentStyle={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '11px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}
-                          labelStyle={{ color: '#ffffff80', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.1em' }}
+                          cursor={{ fill: '#ffffff05' }}
+                          contentStyle={{ backgroundColor: '#09090b', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', fontSize: '11px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}
+                          labelStyle={{ color: '#ffffff40', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.1em' }}
                           formatter={(value: number, name: string) => [
                             Math.round(value * 100) / 100 + ' ' + unit,
                             name === 'total' ? 'Total' : name === 'down' ? 'Download' : 'Upload'
                           ]}
                         />
-                        <Bar dataKey="down" stackId="a" fill="#34d399" radius={[3, 3, 0, 0]} maxBarSize={32} />
-                        <Bar dataKey="up" stackId="a" fill="#22d3ee" radius={[3, 3, 0, 0]} maxBarSize={32} />
+                        <Bar dataKey="down" stackId="a" fill="#34d399" radius={[3, 3, 0, 0]} maxBarSize={32} activeBar={{ fill: '#34d399', stroke: '#34d39940', strokeWidth: 1, filter: 'none' }} />
+                        <Bar dataKey="up" stackId="a" fill="#22d3ee" radius={[3, 3, 0, 0]} maxBarSize={32} activeBar={{ fill: '#22d3ee', stroke: '#22d3ee40', strokeWidth: 1, filter: 'none' }} />
                       </BarChart>
                     </ResponsiveContainer>
                   );
@@ -456,11 +457,11 @@ export default function AdminDashboard({ users: initialUsers, initialNodes = [] 
               <div className="flex items-center justify-end gap-4 mt-3">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-[2px] bg-[#22d3ee]" />
-                  <span className="text-[9px] text-white/25 uppercase tracking-widest font-bold">Up</span>
+                  <span className="text-[9px] text-white/20 uppercase tracking-widest">Up</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-[2px] bg-[#34d399]" />
-                  <span className="text-[9px] text-white/25 uppercase tracking-widest font-bold">Down</span>
+                  <span className="text-[9px] text-white/20 uppercase tracking-widest">Down</span>
                 </div>
               </div>
             </GlassCard>

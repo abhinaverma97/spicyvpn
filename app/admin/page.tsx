@@ -33,7 +33,6 @@ export default async function AdminPage() {
     FROM users u
     LEFT JOIN vpn_configs v ON v.userId = u.id AND v.active = 1
     ORDER BY u.createdAt DESC
-    LIMIT 50
   `).all() as Record<string, unknown>[];
 
   return (

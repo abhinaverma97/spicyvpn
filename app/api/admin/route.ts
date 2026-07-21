@@ -6,21 +6,13 @@ export const dynamic = 'force-dynamic';
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "abhinaverma97@gmail.com";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   const session = await auth();
   if (session?.user?.email !== ADMIN_EMAIL) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { searchParams } = new URL(req.url);
-  const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
-  const pageSize = 50;
-  const offset = (page - 1) * pageSize;
-
   const db = getDb();
-
-  const totalRow = db.prepare("SELECT COUNT(*) as c FROM users").get() as any;
-
   const dbUsers = db.prepare(`
     SELECT 
       users.id, users.name, users.email, users.image, users.createdAt,
@@ -29,24 +21,15 @@ export async function GET(req: NextRequest) {
     FROM users
     LEFT JOIN vpn_configs ON users.id = vpn_configs.userId AND vpn_configs.active = 1
     ORDER BY users.createdAt DESC
-    LIMIT ? OFFSET ?
-  `).all(pageSize, offset) as any[];
+  `).all() as any[];
 
-  const data = dbUsers.map(u => ({
-    id: u.id,
-    name: u.name,
-    email: u.email,
-    image: u.image,
-    joinedAt: new Date((u.createdAt as number) * 1000).toISOString(),
-    token: u.token,
-    expiresAt: u.expiresAt ? new Date((u.expiresAt as number) * 1000).toISOString() : null,
-    active: Boolean(u.active),
-    lastActive: u.lastActive,
+  const users = dbUsers.map(u => ({
+    ...u,
     usedTraffic: (u.totalUp || 0) + (u.totalDown || 0),
     dataLimit: u.dataLimit || -1
   }));
 
-  return NextResponse.json({ data, total: totalRow.c });
+  return NextResponse.json(users);
 }
 
 export async function DELETE(req: NextRequest) {

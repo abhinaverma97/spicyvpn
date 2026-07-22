@@ -155,4 +155,23 @@ A high-level map of the codebase and system dependencies:
 
 ---
 
+---
+
+## 8. Test Node (Isolated)
+
+A standalone installer that sets up an **identical Xray node** on any VPS without connecting to the SpicyVPN fleet. Useful for testing config changes, evaluating VPS providers, or benchmarking.
+
+```bash
+curl -sL https://raw.githubusercontent.com/abhinaverma97/spicyvpn/main/scripts/install-test-node.sh | bash -s -- --ip <vps-public-ip>
+```
+
+The script outputs a VLESS link you can import directly into Hiddify.
+
+### Complete cleanup
+```bash
+sudo systemctl stop xray-test && sudo systemctl disable xray-test && sudo rm -rf /usr/local/etc/xray /usr/local/bin/xray /etc/systemd/system/xray-test.service /etc/sysctl.d/99-spicyvpn-test.conf && sudo systemctl daemon-reload
+```
+
+---
+
 **🌶️ Stay Spicy. Stay Fast.**

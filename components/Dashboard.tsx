@@ -320,7 +320,7 @@ export default function Dashboard({ user }: { user: User }) {
                       href="https://play.google.com/store/apps/details?id=app.hiddify.com&hl=en_IN"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm font-bold px-4 py-2.5 rounded-xl border border-white/10 text-white/50 hover:border-white/30 hover:text-white transition-all bg-white/5"
+                      className="w-full sm:w-auto text-sm font-bold px-5 py-3 rounded-xl border border-white/10 text-white/50 hover:border-white/30 hover:text-white transition-all bg-white/5 text-center"
                     >
                       Hiddify
                     </a>
@@ -459,10 +459,10 @@ export default function Dashboard({ user }: { user: User }) {
 
             </div> {/* end grid */}
 
-            <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-4 flex items-center gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
-              <p className="text-base text-amber-400 font-medium">
-                Chrome/Brave might have issues if using Hiddify.
+            <div className="bg-white/5 border border-white/10 rounded-md p-4 flex items-center gap-3">
+              <RefreshCw className="w-5 h-5 text-white/40 shrink-0" />
+              <p className="text-base text-white/60">
+                If a site isn&apos;t loading, disconnect and reconnect the VPN.
               </p>
             </div>
 

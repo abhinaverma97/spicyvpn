@@ -48,14 +48,14 @@ echo "Test user UUID: $UUID"
 echo "Applying kernel TCP optimizations..."
 cat >> /etc/sysctl.d/99-spicyvpn-test.conf <<EOF
 # SpicyVPN TCP tuning
-net.core.default_qdisc = fq
+net.core.default_qdisc = fq_codel
 net.ipv4.tcp_congestion_control = bbr
 net.ipv4.tcp_fastopen = 3
 net.ipv4.tcp_slow_start_after_idle = 0
 net.ipv4.tcp_notsent_lowat = 131072
 EOF
 sysctl -p /etc/sysctl.d/99-spicyvpn-test.conf >/dev/null 2>&1
-echo "TCP tuning applied (BBR, fq, fastopen)"
+echo "TCP tuning applied (BBR, fq_codel, fastopen)"
 
 # --- Install Xray-core ---
 XRAY_VERSION=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | jq -r .tag_name)

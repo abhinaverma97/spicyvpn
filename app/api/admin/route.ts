@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
   const db = getDb();
   const now = Math.floor(Date.now() / 1000);
-  const ACTIVE_THRESHOLD = now - 60;
+  const ACTIVE_THRESHOLD = now - 90;
 
   const conditions: string[] = [];
   const params: any[] = [];

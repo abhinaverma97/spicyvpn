@@ -56,8 +56,8 @@ export async function POST(req: Request) {
         }
       }
 
-      // 2. Accurate Live Users check matching the Admin Dashboard logic (active within last 60s)
-      const liveUsersQuery = db.prepare(`SELECT COUNT(*) as count FROM vpn_configs WHERE lastActive >= ? AND nodeId = ?`).get(now - 60, node.id) as any;
+      // 2. Accurate Live Users check matching the Admin Dashboard logic (active within last 90s)
+      const liveUsersQuery = db.prepare(`SELECT COUNT(*) as count FROM vpn_configs WHERE lastActive >= ? AND nodeId = ?`).get(now - 90, node.id) as any;
       const calculatedLiveUsers = liveUsersQuery ? liveUsersQuery.count : 0;
 
       // 3. Update Node Stats & Save current traffic as lastTraffic for next diff

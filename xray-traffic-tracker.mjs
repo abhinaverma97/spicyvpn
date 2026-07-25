@@ -53,14 +53,35 @@ function getCpuPct() {
 function flushTraffic() {
   const entries = Object.entries(pendingTraffic);
   const now = Math.floor(Date.now() / 1000);
+  const ACTIVE_THRESHOLD = now - 90;
 
-  // Always update telemetry (even when no traffic to flush)
+  // 1. Update DB traffic & lastActive FIRST inside transaction
+  if (entries.length > 0) {
+    const monthStr = new Date().toISOString().substring(0, 7);
+    let totalUp = 0, totalDown = 0;
+
+    db.transaction(() => {
+      for (const [token, t] of entries) {
+        db.prepare(`UPDATE vpn_configs SET totalUp = totalUp + ?, totalDown = totalDown + ?, lastActive = ? WHERE token = ?`)
+          .run(t.up, t.down, t.lastActive, token);
+        totalUp += t.up;
+        totalDown += t.down;
+      }
+      db.prepare(`INSERT OR IGNORE INTO monthly_stats (month, totalUp, totalDown) VALUES (?, 0, 0)`).run(monthStr);
+      db.prepare(`UPDATE monthly_stats SET totalUp = totalUp + ?, totalDown = totalDown + ? WHERE month = ?`).run(totalUp, totalDown, monthStr);
+      db.prepare(`INSERT OR IGNORE INTO node_bandwidth (nodeId, month, totalUp, totalDown) VALUES ('node-1', ?, 0, 0)`).run(monthStr);
+      db.prepare(`UPDATE node_bandwidth SET totalUp = totalUp + ?, totalDown = totalDown + ? WHERE nodeId = 'node-1' AND month = ?`).run(totalUp, totalDown, monthStr);
+    })();
+    pendingTraffic = {};
+  }
+
+  // 2. Query live users AFTER updating database
   const load = os.loadavg();
   const totalMem = os.totalmem();
   const freeMem = os.freemem();
   const usedMem = totalMem - freeMem;
   const ramPct = Math.round((usedMem / totalMem) * 100);
-  const liveUsersQuery = db.prepare(`SELECT COUNT(*) as count FROM vpn_configs WHERE lastActive >= ? AND (nodeId = 'node-1' OR nodeId IS NULL)`).get(now - 60);
+  const liveUsersQuery = db.prepare(`SELECT COUNT(*) as count FROM vpn_configs WHERE lastActive >= ? AND (nodeId = 'node-1' OR nodeId IS NULL)`).get(ACTIVE_THRESHOLD);
   const liveUsersCount = liveUsersQuery ? liveUsersQuery.count : 0;
 
   db.prepare(`
@@ -69,31 +90,12 @@ function flushTraffic() {
     WHERE id = 'node-1'
   `).run(now, getCpuPct(), ramPct, liveUsersCount);
 
-  const fleetLiveQuery = db.prepare(`SELECT COUNT(*) as count FROM vpn_configs WHERE lastActive >= ?`).get(now - 60);
+  const fleetLiveQuery = db.prepare(`SELECT COUNT(*) as count FROM vpn_configs WHERE lastActive >= ?`).get(ACTIVE_THRESHOLD);
   const fleetLiveCount = fleetLiveQuery ? fleetLiveQuery.count : 0;
   const lastLog = db.prepare("SELECT ts FROM user_count_log ORDER BY ts DESC LIMIT 1").get();
   if (!lastLog || now - lastLog.ts >= 300) {
     db.prepare("INSERT OR IGNORE INTO user_count_log (ts, count) VALUES (?, ?)").run(now, fleetLiveCount);
   }
-
-  if (entries.length === 0) return;
-
-  const monthStr = new Date().toISOString().substring(0, 7);
-  let totalUp = 0, totalDown = 0;
-
-  db.transaction(() => {
-    for (const [token, t] of entries) {
-      db.prepare(`UPDATE vpn_configs SET totalUp = totalUp + ?, totalDown = totalDown + ?, lastActive = ? WHERE token = ?`)
-        .run(t.up, t.down, t.lastActive, token);
-      totalUp += t.up;
-      totalDown += t.down;
-    }
-    db.prepare(`INSERT OR IGNORE INTO monthly_stats (month, totalUp, totalDown) VALUES (?, 0, 0)`).run(monthStr);
-    db.prepare(`UPDATE monthly_stats SET totalUp = totalUp + ?, totalDown = totalDown + ? WHERE month = ?`).run(totalUp, totalDown, monthStr);
-    db.prepare(`INSERT OR IGNORE INTO node_bandwidth (nodeId, month, totalUp, totalDown) VALUES ('node-1', ?, 0, 0)`).run(monthStr);
-    db.prepare(`UPDATE node_bandwidth SET totalUp = totalUp + ?, totalDown = totalDown + ? WHERE nodeId = 'node-1' AND month = ?`).run(totalUp, totalDown, monthStr);
-  })();
-  pendingTraffic = {};
 }
 
 async function syncAndTrack() {
@@ -178,7 +180,7 @@ async function syncAndTrack() {
       }
     }
 
-    // Accumulate traffic diffs in memory (flush to DB every 60s)
+    // Accumulate traffic diffs in memory
     for (const [token, stats] of Object.entries(currentBatch)) {
       const prev = previousStats[token] || { tx: 0, rx: 0 };
       let diffUp = stats.tx - prev.tx;
@@ -195,12 +197,8 @@ async function syncAndTrack() {
       }
     }
 
-    // 5. Flush accumulated traffic to DB every 2 cycles (60s)
-    cycleCounter++;
-    if (cycleCounter >= 2) {
-      flushTraffic();
-      cycleCounter = 0;
-    }
+    // 5. Flush traffic to DB immediately on every 30s cycle
+    flushTraffic();
 
     previousStats = currentBatch;
     db.prepare("UPDATE nodes SET lastTraffic = ? WHERE id = 'node-1'").run(JSON.stringify(currentBatch));

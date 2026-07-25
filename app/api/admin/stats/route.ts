@@ -73,8 +73,8 @@ export async function GET() {
   const activeConfigsRow = db.prepare("SELECT COUNT(*) as count FROM vpn_configs WHERE active = 1 AND expiresAt > ?").get(now) as any;
   const activeConfigsCount = activeConfigsRow.count;
 
-  // 2. Threshold for live check (last 60 seconds)
-  const ACTIVE_THRESHOLD = now - 60; 
+  // 2. Threshold for live check (last 90 seconds)
+  const ACTIVE_THRESHOLD = now - 90; 
 
   const globalTraffic = db.prepare(`
     SELECT (SELECT COUNT(*) FROM vpn_configs WHERE lastActive >= ?) as live_count

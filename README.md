@@ -158,7 +158,8 @@ spicyvpn/
 │       ├── agent.mjs           # Node Slave Synchronization Daemon
 │       └── install.sh          # Multi-Arch Automated Node Provisioning Script
 ├── scripts/                    # Management & Benchmark Scripts
-│   └── install-test-node.sh    # Standalone Test Node Installer Script
+│   ├── install-test-node.sh            # Standalone Test Node Installer Script
+│   └── install-optimized-test-node.sh  # Low-Latency Gaming Optimized Test Node Installer
 ├── deploy.sh                   # Deployment Automation Script
 ├── DOMAIN_MIGRATION.md         # Domain Migration Checklist & Guide
 ├── xray-traffic-tracker.mjs    # Master Telemetry, Sync & User Kicker Service
@@ -184,19 +185,26 @@ spicyvpn/
 
 ---
 
-## 8. Test Node (Isolated)
+## 8. Test Nodes (Isolated)
 
-A standalone installer that sets up an **identical Xray node** on any VPS without connecting to the SpicyVPN fleet. Useful for testing config changes, evaluating VPS providers, or benchmarking.
+Standalone installers that set up an **isolated Xray node** on any VPS without connecting to the SpicyVPN fleet. Useful for testing config changes, evaluating VPS providers, benchmarking, or gaming optimization.
 
+### Standard Test Node
 ```bash
 curl -sL https://raw.githubusercontent.com/abhinaverma97/spicyvpn/main/scripts/install-test-node.sh | bash -s -- --ip <vps-public-ip>
+```
+
+### Low-Latency Gaming Optimized Test Node
+Includes anti-bufferbloat kernel TCP tuning (`tcp_notsent_lowat = 16384`, Selective ACK, low-latency socket buffers):
+```bash
+curl -sL https://raw.githubusercontent.com/abhinaverma97/spicyvpn/main/scripts/install-optimized-test-node.sh | bash -s -- --ip <vps-public-ip>
 ```
 
 The script outputs a VLESS link you can import directly into Hiddify.
 
 ### Complete cleanup
 ```bash
-sudo systemctl stop xray-test && sudo systemctl disable xray-test && sudo rm -rf /usr/local/etc/xray /usr/local/bin/xray /etc/systemd/system/xray-test.service /etc/sysctl.d/99-spicyvpn-test.conf && sudo systemctl daemon-reload
+sudo systemctl stop xray-test xray-opt-test 2>/dev/null; sudo systemctl disable xray-test xray-opt-test 2>/dev/null; sudo rm -rf /usr/local/etc/xray /usr/local/bin/xray /etc/systemd/system/xray-test.service /etc/systemd/system/xray-opt-test.service /etc/sysctl.d/99-spicyvpn-test.conf /etc/sysctl.d/99-spicyvpn-opt.conf && sudo systemctl daemon-reload
 ```
 
 ---

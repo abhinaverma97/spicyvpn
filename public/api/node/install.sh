@@ -61,28 +61,15 @@ if command -v netfilter-persistent &> /dev/null; then
     netfilter-persistent reload
 fi
 
-# 🚀 Gaming & Low-Latency Kernel TCP Tuning
-echo "🚀 Applying gaming-optimized kernel TCP parameters..."
-cat > /etc/sysctl.d/99-spicyvpn.conf <<EOF
-# SpicyVPN Anti-Ping-Spike Gaming Sysctl
-net.core.default_qdisc = fq_codel
-net.ipv4.tcp_congestion_control = cubic
-
-# Disable slow start after idle
+# 🚀 Kernel TCP Tuning
+echo "🚀 Applying kernel TCP optimizations..."
+cat >> /etc/sysctl.d/99-spicyvpn.conf <<EOF
+# SpicyVPN TCP tuning
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
+net.ipv4.tcp_fastopen = 3
 net.ipv4.tcp_slow_start_after_idle = 0
-
-# Anti-Bufferbloat Socket Limit (Prevents queue inflation)
-net.ipv4.tcp_notsent_lowat = 16384
-
-# Enable TCP Selective ACK & Timestamps for ultra-fast loss recovery
-net.ipv4.tcp_sack = 1
-net.ipv4.tcp_dsack = 1
-net.ipv4.tcp_timestamps = 1
-net.ipv4.tcp_window_scaling = 1
-
-# Low-Latency Socket Memory Allocations
-net.ipv4.tcp_rmem = 4096 87380 6291456
-net.ipv4.tcp_wmem = 4096 16384 4194304
+net.ipv4.tcp_notsent_lowat = 131072
 EOF
 sysctl -p /etc/sysctl.d/99-spicyvpn.conf
 

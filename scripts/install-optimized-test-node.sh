@@ -46,13 +46,14 @@ echo "✅ Test user UUID: $UUID"
 # --- Low-Latency Gaming TCP Tuning ---
 echo "🚀 Applying Gaming-Optimized Kernel TCP Parameters..."
 cat > /etc/sysctl.d/99-spicyvpn-opt.conf <<EOF
-# SpicyVPN Gaming & Low-Latency TCP Tuning
-net.core.default_qdisc = fq
-net.ipv4.tcp_congestion_control = bbr
-net.ipv4.tcp_fastopen = 3
+# SpicyVPN Anti-Ping-Spike Gaming Sysctl
+net.core.default_qdisc = fq_codel
+net.ipv4.tcp_congestion_control = cubic
+
+# Disable slow start after idle
 net.ipv4.tcp_slow_start_after_idle = 0
 
-# Low-latency socket buffer limit (prevents bufferbloat ping spikes)
+# Anti-Bufferbloat Socket Limit (Prevents queue inflation)
 net.ipv4.tcp_notsent_lowat = 16384
 
 # Enable TCP Selective ACK & Timestamps for ultra-fast loss recovery
@@ -61,13 +62,13 @@ net.ipv4.tcp_dsack = 1
 net.ipv4.tcp_timestamps = 1
 net.ipv4.tcp_window_scaling = 1
 
-# Low-latency tuned socket memory allocations
+# Low-Latency Socket Memory Allocations
 net.ipv4.tcp_rmem = 4096 87380 6291456
 net.ipv4.tcp_wmem = 4096 16384 4194304
 EOF
 
 sysctl -p /etc/sysctl.d/99-spicyvpn-opt.conf >/dev/null 2>&1
-echo "✅ TCP tuning applied (BBR, fq, tcp_notsent_lowat=16k, fastopen=3)"
+echo "✅ TCP tuning applied (cubic, fq_codel, tcp_notsent_lowat=16k)"
 
 # --- Install Xray-core ---
 XRAY_VERSION=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | jq -r .tag_name)

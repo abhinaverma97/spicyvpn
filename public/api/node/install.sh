@@ -70,6 +70,11 @@ net.ipv4.tcp_congestion_control = bbr
 net.ipv4.tcp_fastopen = 3
 net.ipv4.tcp_slow_start_after_idle = 0
 net.ipv4.tcp_notsent_lowat = 131072
+net.ipv4.tcp_recovery = 4
+net.ipv4.tcp_limit_output_bytes = 1048576
+net.ipv4.tcp_pacing_ca_ratio = 100
+net.ipv4.tcp_pacing_ss_ratio = 120
+net.core.netdev_max_backlog = 2000
 EOF
 sysctl -p /etc/sysctl.d/99-spicyvpn.conf
 

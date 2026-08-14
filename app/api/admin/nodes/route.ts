@@ -82,7 +82,7 @@ export async function POST(req: Request) {
     VALUES (?, ?, ?, NULL, ?, 'active', 0)
   `).run(id, name, ip, apiKey);
 
-  const installCommand = `curl -sL ${process.env.NEXT_PUBLIC_APP_URL || "https://spicypepper.app"}/api/node/install.sh | sudo bash -s -- --key ${apiKey} --master ${process.env.NEXT_PUBLIC_APP_URL || "https://spicypepper.app"}`;
+  const installCommand = `curl -sL ${process.env.NEXT_PUBLIC_APP_URL || "https://spicy.sytes.net"}/api/node/install.sh | sudo bash -s -- --key ${apiKey} --master ${process.env.NEXT_PUBLIC_APP_URL || "https://spicy.sytes.net"}`;
 
   return NextResponse.json({ 
     id, 

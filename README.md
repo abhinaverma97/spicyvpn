@@ -95,12 +95,11 @@ SpicyVPN scales globally using a **Master-Slave (Orchestrator-Agent)** model, en
 The primary server acts as the central brain and Source of Truth.
 - **Stateless Scaling:** Remote nodes hold zero persistent state. User accounts, bandwidth metrics, and expiry limits exist exclusively in the Master SQLite database.
 - **Load Balancing (Least Connections):** When a user requests a config or subscription, the Master assigns them to the node with the **lowest live user count** (`getBestNode()`).
-- **SSL Certificate Synchronization:** Master SSL certificates (`spicypepper.app.crt`/`.key`) are distributed to remote nodes via `/api/node/sync`. When cert updates are detected, remote nodes write them to `/usr/local/etc/xray/certs/` and restart Xray.
 
 ### **The Remote Nodes (Slaves)**
 Remote nodes are lightweight VPS instances running **Xray-core** and the **SpicyAgent** daemon (`agent.mjs`).
 - **Auto-Provisioning:** Multi-architecture `public/api/node/install.sh` detects `x86_64` vs `ARM64`, installs Xray-core, configures `systemd` services, and applies firewall rules (`iptables` for OCI).
-- **User Synchronization:** Every 10 seconds (`setInterval(sync, 10000)`), the agent fetches authorized users from `/api/node/sync`, applies incremental `adu`/`rmu` diffs to Xray memory, and syncs local state.
+- **User Synchronization:** Every 10 seconds (`setInterval(sync, 10000)`), the agent fetches authorized users from `/api/node/sync`, applies incremental `adu`/`rmu` diffs to Xray memory, and syncs local state. (Remote nodes run with self-signed certs — clients use `allowInsecure=1`, so certificates are never validated.)
 
 ### **Precision Telemetry Logic**
 - **Stability-First CPU Monitoring:** Calculates CPU usage using `/proc/stat` delta differences to provide consistent 0-100% telemetry across CPU architectures.

@@ -82,25 +82,8 @@ async function sync() {
         const masterTokens = masterUsers.map(u => u.token);
         const localTokens = fs.readFileSync(STATE_FILE, 'utf8').split('\n').filter(Boolean);
 
-        // 2. Synchronize SSL Certificates from Master
-        if (data.masterCert && data.masterKey) {
-            const currentCert = fs.existsSync('/usr/local/etc/xray/certs/cert.pem') ? fs.readFileSync('/usr/local/etc/xray/certs/cert.pem', 'utf8') : '';
-            if (currentCert !== data.masterCert) {
-                console.log('🔄 Master SSL Certificate update detected. Syncing to local node...');
-                fs.writeFileSync('/usr/local/etc/xray/certs/cert.pem', data.masterCert);
-                fs.writeFileSync('/usr/local/etc/xray/certs/key.pem', data.masterKey);
-                console.log('✅ SSL files saved to disk. Restarting Xray to load into RAM...');
-                try {
-                    execSync('systemctl restart xray');
-                    console.log('✅ Xray restarted successfully.');
-                } catch (e) {
-                    console.error('❌ Failed to restart Xray:', e.message);
-                }
-            }
-        }
+        // 2. Incremental Sync
 
-        // 3. Incremental Sync
-        
         const buildWrapper = (clients) => ({
             inbounds: [{
                 port: 8444, 
@@ -140,7 +123,7 @@ async function sync() {
             }
         }
 
-        // 4. Report Telemetry
+        // 3. Report Telemetry
         const { cpu, ram } = getStats();
         const trafficStats = getXrayStats();
         console.log(`[REPORT] CPU: ${cpu}% | RAM: ${ram}% | Users: ${masterUsers.length}`);

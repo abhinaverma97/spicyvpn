@@ -91,7 +91,7 @@ rm xray.zip
 # 🔐 SSL Certificate Management (Self-Signed)
 echo "🔐 Generating Self-Signed TLS Certificates..."
 mkdir -p /usr/local/etc/xray/certs
-openssl req -x509 -newkey rsa:4096 -keyout /usr/local/etc/xray/certs/key.pem -out /usr/local/etc/xray/certs/cert.pem -sha256 -days 3650 -nodes -subj "/CN=spicypepper.app" &>/dev/null
+openssl req -x509 -newkey rsa:4096 -keyout /usr/local/etc/xray/certs/key.pem -out /usr/local/etc/xray/certs/cert.pem -sha256 -days 3650 -nodes -subj "/CN=spicy.sytes.net" &>/dev/null
 
 cat <<EOF > /usr/local/etc/xray/config.json
 {

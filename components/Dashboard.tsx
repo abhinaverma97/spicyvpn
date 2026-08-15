@@ -230,7 +230,7 @@ export default function Dashboard({ user }: { user: User }) {
                 <div>
                   <h2 className="text-2xl font-bold text-white/90 mb-1">Subscription Link</h2>
                   <p className="text-white/40 text-base">
-                    Copy this link and import it into Hiddify or SpicyVPN Desktop.
+                    Copy this link and import it into Hiddify.
                   </p>
                 </div>
                 <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 px-4 py-1.5 text-sm font-bold shrink-0">
@@ -343,19 +343,19 @@ export default function Dashboard({ user }: { user: User }) {
                     <span className="text-lg font-bold text-white/80">Windows</span>
                     <div className="ml-auto flex gap-2">
                       <a
-                        href="https://github.com/abhinaverma97/spicyvpn-desktop/releases/download/v1.0.73/SpicyVPN_1.0.73_x64-setup.exe"
+                        href="https://github.com/hiddify/hiddify-app/releases/download/v4.1.1/Hiddify-Windows-Setup-x64.exe"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm font-bold px-4 py-2 rounded-xl border border-emerald-500/20 text-emerald-400 hover:border-emerald-500/40 hover:text-emerald-300 transition-all bg-emerald-500/5"
+                        className="text-sm font-bold px-4 py-2 rounded-xl border border-white/10 text-white/50 hover:border-white/30 hover:text-white transition-all bg-white/5"
                       >
-                        Download SpicyVPN
+                        Download Hiddify
                       </a>
                     </div>
                   </div>
                   <ol className="space-y-2 text-base text-white/30 ml-4 border-l border-white/5 pl-6">
-                    <li>1. Install <span className="text-white/60 font-medium">SpicyVPN Desktop</span></li>
+                    <li>1. Install <span className="text-white/60 font-medium">Hiddify</span></li>
                     <li>2. Copy your subscription link from the box above</li>
-                    <li>3. Paste into the app and click <span className="text-white/60 font-medium">Save Gateway</span></li>
+                    <li>3. Paste into Hiddify → <span className="text-white/60 font-medium">Add from clipboard</span></li>
                     <li>4. Click <span className="text-white/60 font-medium">Connect</span></li>
                   </ol>
                 </div>

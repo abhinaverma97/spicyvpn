@@ -416,14 +416,9 @@ export default function Dashboard({ user }: { user: User }) {
             {/* Games & System Apps */}
             <GlassCard className="hidden md:flex flex-col h-full border-white/5" intensity={0.05}>
               <div className="p-8 pb-4">
-                <h3 className="text-xl font-bold text-white/90 mb-1">If you are using Hiddify</h3>
-                <p className="text-white/40 text-base leading-relaxed">Discord, Valorant, and any UDP app — enable VPN mode for full system routing</p>
+                <h3 className="text-xl font-bold text-white/90 mb-1">Hiddify Guide</h3>
               </div>
               <div className="p-8 pt-0 space-y-6 flex-1">
-                <p className="text-base text-white/30 leading-relaxed italic border-l-2 border-white/10 pl-4">
-                  By default Hiddify runs as a proxy — games and apps using UDP won&apos;t go through it. 
-                  Enable <span className="text-white/60 font-bold">VPN mode</span> to route all traffic.
-                </p>
                 <ol className="space-y-6 text-base text-white/40">
                   <li className="flex gap-4">
                     <span className="shrink-0 w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-xs font-bold border border-white/10">1</span>
